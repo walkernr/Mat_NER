@@ -1,4 +1,3 @@
-data/*/original/*.json
 data/*/split/*.tsv
 model/scibert
 model/matbert
