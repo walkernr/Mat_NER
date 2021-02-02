@@ -11,4 +11,5 @@ scripts/__pycache__
 !data/ner_annotations/split
 !model/transformer/history
 !model/bilstm/history
-
+!README.md
+!LICENSE
