@@ -1,0 +1,14 @@
+data/*/original/*.json
+data/*/split/*.tsv
+model/scibert
+model/matbert
+model/*/*.pt
+model/*/history/*.pt
+scripts/plot*.py
+scripts/__pycache__
+!data/ner_annotations
+!data/ner_annotations/original
+!data/ner_annotations/split
+!model/transformer/history
+!model/bilstm/history
+
