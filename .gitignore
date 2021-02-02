@@ -1,9 +1,0 @@
-data/*/*.json
-data/*/*.tsv
-model/scibert
-model/matbert
-model/*/*.pt
-model/*/history/*.pt
-scripts/plot*.py
-scripts/__pycache__
-
