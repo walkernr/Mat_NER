@@ -25,13 +25,11 @@ class CRF(nn.Module):
             # cannot begin sentence with I (inside), only B (beginning) or O (outside)
             self.invalid_begin = ('I',)
             # cannot end sentence with B (beginning) or I (inside) - assumes data ends with O (outside), such as punctuation
-            self.invalid_end = ('B', 'I')
+            self.invalid_end = ()  # ('B', 'I')
             # prevent B (beginning) going to P - B must be followed by B, I, or O
             # prevent I (inside) going to P - I must be followed by B, I, or O
             # prevent O (outside) going to I (inside) - O must be followed by B or O
-            self.invalid_transitions_position = {'B': 'P',
-                                                 'I': 'P',
-                                                 'O': 'I'}
+            self.invalid_transitions_position = {'O': 'I'}
             # prevent B (beginning) going to I (inside) of a different type
             # prevent I (inside) going to I (inside) of a different type
             self.invalid_transitions_tags = {'B': 'I',
@@ -41,14 +39,14 @@ class CRF(nn.Module):
             # cannot begin sentence with I (inside) or L (last)
             self.invalid_begin = ('I', 'L')
             # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ('B', 'I')
+            self.invalid_end = ()  # ('B', 'I')
             # prevent B (beginning) going to B (beginning), O (outside), U (unit), or P - B must be followed by I or L
             # prevent I (inside) going to B (beginning), O (outside), U (unit), or P - I must be followed by I or L
             # prevent L (last) going to I (inside) or L(last) - U must be followed by B, O, U, or P
             # prevent U (unit) going to I (inside) or L(last) - U must be followed by B, O, U, or P
             # prevent O (outside) going to I (inside) or L (last) - O must be followed by B, O, U, or P
-            self.invalid_transitions_position = {'B': 'BOUP',
-                                                 'I': 'BOUP',
+            self.invalid_transitions_position = {'B': 'BOU',
+                                                 'I': 'BOU',
                                                  'L': 'IL',
                                                  'U': 'IL',
                                                  'O': 'IL'}
@@ -61,14 +59,14 @@ class CRF(nn.Module):
             # cannot begin sentence with I (inside) or E (end)
             self.invalid_begin = ('I', 'E')
             # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ('B', 'I')
+            self.invalid_end = ()  # ('B', 'I')
             # prevent B (beginning) going to B (beginning), O (outside), S (single), or P - B must be followed by I or E
             # prevent I (inside) going to B (beginning), O (outside), S (single), or P - I must be followed by I or E
             # prevent E (end) going to I (inside) or E (end) - U must be followed by B, O, U, or P
             # prevent S (single) going to I (inside) or E (end) - U must be followed by B, O, U, or P
             # prevent O (outside) going to I (inside) or E (end) - O must be followed by B, O, U, or P
-            self.invalid_transitions_position = {'B': 'BOSP',
-                                                 'I': 'BOSP',
+            self.invalid_transitions_position = {'B': 'BOS',
+                                                 'I': 'BOS',
                                                  'E': 'IE',
                                                  'S': 'IE',
                                                  'O': 'IE'}
@@ -85,14 +83,12 @@ class CRF(nn.Module):
             tag_name = self.tag_names[i]
             if tag_name[0] in self.invalid_begin or tag_name == self.pad_token:
                 torch.nn.init.constant_(self.crf.start_transitions[i], imp_value)
-            # don't penalize endings since not every example ends with punctuation
-            # if tag_name[0] in self.invalid_end:
-            #     torch.nn.init.constant_(self.crf.end_transitions[i], imp_value)
+            if tag_name[0] in self.invalid_end:
+                torch.nn.init.constant_(self.crf.end_transitions[i], imp_value)
         # build tag type dictionary
         tag_is = {}
         for tag_position in self.prefixes:
             tag_is[tag_position] = [i for i, tag in enumerate(self.tag_names) if tag[0] == tag_position]
-        tag_is['P'] = [i for i, tag in enumerate(self.tag_names) if tag == 'tag']
         # penalties for invalid consecutive tags by position
         for from_tag, to_tag_list in self.invalid_transitions_position.items():
             to_tags = list(to_tag_list)

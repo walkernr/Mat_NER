@@ -19,7 +19,7 @@ def data_tag(data, format):
         dat['tag'] = []
         for i in range(len(annotation)):
             if format == 'IOB2':
-                if annotation[i] == None:
+                if annotation[i] in [None, 'PVL', 'PUT']:
                     dat['tag'].append('O')
                 elif i == 0:
                     dat['tag'].append('B-'+annotation[i])

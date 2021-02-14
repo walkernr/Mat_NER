@@ -2,7 +2,6 @@ import math
 import torch
 from torch import nn
 from model_crf import CRF
-from transformers import AutoModel
 
 
 class PositionalEncoding(nn.Module):
@@ -63,7 +62,6 @@ class NERModel(nn.Module):
         # initialize the superclass
         super().__init__()
         # dimensions
-        self.bert_model = False
         self.input_dim, self.embedding_dim = input_dim, embedding_dim
         self.char_input_dim, self.char_embedding_dim = char_input_dim, char_embedding_dim
         self.char_filter, self.char_kernel = char_filter, char_kernel
@@ -373,66 +371,3 @@ class Transformer_NER(NERModel):
             return crf_out, crf_loss
         else:
             return fc2_out
-
-
-class BERT_NER(nn.Module):
-    def __init__(self, model_path, output_dim, use_crf, hidden_dropout_ratio, tag_pad_idx, pad_token, tag_names):
-        '''
-        bert sequence classifier
-        output_dim: number of output classes
-        use_crf: switch for using conditional random field (reduces probability of invalid tagging sequences)
-        tag_pad_idx: index for tag padding token
-        pad_token: pad token
-        tag_names: the names of all of the tags in the tag field
-        '''
-        super().__init__()
-        self.bert_model = True
-        self.config = AutoConfig.from_pretrained(model_path)
-        self.output_dim = output_dim
-        self.use_crf = use_crf
-        self.hidden_dropout_ratio = hidden_dropout_ratio
-        self.tag_pad_idx, self.pad_token, self.tag_names = tag_pad_idx, pad_token, tag_names
-        self.build_model_layers()
-        self.init_weights()
-
-
-    def build_model_layers(self):
-        ''' builds the layers in the model '''
-        self.bert = AutoModel.from_pretrained(model_path)
-        self.fc_dropout = nn.Dropout(self.hidden_dropout_ratio)
-        self.fc = nn.Linear(self.config.hidden_size, self.output_dim)
-        if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names)
-    
-
-    def forward(self, sentence, attention_mask, tags):
-        ''' forward operation for network '''
-        outputs = self.bert(sentence, token_type_ids=None, attention_mask=attention_mask, labels=tags)
-        sequence_output = outputs[0]
-        logits = self.fc(self.fc_dropout(self.sequence_output))
-        if self.use_crf:
-            # remove first token id in each sentence (to make crf mask work)
-            # crf_out, crf_loss = self.crf(logits, tags)
-            crf_out, crf_loss = self.crf(logits[:, 1:], tags[:, 1:])
-            return crf_out, crf_loss
-        else:
-            return logits
-    
-
-    def init_weights(self):
-        ''' initializes model weights '''
-        # param_initializer = list(self.bert.classifier.named_parameters())
-        # if self.crf:
-        #     param_initializer += list(self.crf.named_parameters())
-        # for name, param in param_initializer:
-        #     nn.init.normal_(param.data, mean=0, std=0.1)
-        
-        # only initialize conditional random field weights
-        if self.crf:
-            for name, param in self.crf.named_parameters():
-                nn.init.normal_(param.data, mean=0, std=0.1)
-        
-
-    def count_parameters(self):
-        ''' counts model parameters '''
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
