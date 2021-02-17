@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from tqdm import tqdm
 import torch
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from seqeval.metrics import accuracy_score, f1_score
 
 
@@ -43,7 +43,6 @@ class NERTrainer(object):
         self.lr = lr
         self.max_grad_norm = max_grad_norm
         self.optimizer = optimizer_cls(self.model.parameters(), lr=self.lr)
-        self.scheduler = self.schedule_lr()
         self.state_cacher = StateCacher()
         self.save_state_to_cache('start')
         # initialize empty lists for training
@@ -91,8 +90,8 @@ class NERTrainer(object):
         return self.epoch_metrics
     
 
-    def schedule_lr(self):
-        self.lr_scheduler = ReduceLROnPlateau(optimizer=self.optimizer, patience=8, factor=0.25, mode='max', verbose=True)
+    def init_scheduler(self, T_max):
+        self.lr_scheduler = CosineAnnealingLR(optimizer=self.optimizer, T_max=T_max, verbose=True)
     
 
     def iterate_batches(self, epoch, n_epoch, iterator, train, mode):
@@ -189,7 +188,8 @@ class NERTrainer(object):
             with torch.no_grad():
                 # evaluate all of the batches and collect the batch/epoch loss/metrics
                 metrics = self.iterate_batches(epoch, n_epoch, iterator, train, mode)
-                self.lr_scheduler.step(np.mean(metrics['f1_score']))
+                if epoch >= int(np.floor(0.72*n_epoch)):
+                    self.lr_scheduler.step()
         # return batch/epoch loss/metrics
         return metrics
     
@@ -202,6 +202,7 @@ class NERTrainer(object):
         n_epoch: number of training epochs
 
         '''
+        self.init_scheduler(T_max=int(np.ceil(0.28*n_epoch)))
         for epoch in range(n_epoch):
             # training
             train_metrics = self.train_evaluate_epoch(epoch, n_epoch, self.data.train_iter, True, 'train')

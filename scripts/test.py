@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from torch import nn
 from torch.optim import Adam
+from torchtools.optim import RangerLars
 from data_utilities import data_format, data_tag, data_split, data_save
 from data_tokenizer import MaterialsTextTokenizer
 from data_corpus import DataCorpus
@@ -40,12 +41,11 @@ n, m = int(n), int(m)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 256
-# torch.manual_seed(seed)
-# torch.backends.cudnn.deterministic = True
+torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
 
 new_calculation = True
 use_history = False
-lr_schedule = False
 
 phraser_path = (Path(__file__).parent / '../model/phraser/phraser.pkl').resolve().as_posix()
 vector_path = (Path(__file__).parent / '../model/mat2vec/pretrained_embeddings').resolve().as_posix()
@@ -67,15 +67,16 @@ cnn_dropout_ratio = 0.25
 fc_dropout_ratio = 0.25
 # shared attention parameters
 attn_heads = 16
-attn_dropout_ratio = 0.25
 
 # lstm parameters
 hidden_dim = 64
 lstm_layers = 2
 lstm_dropout_ratio = 0.1
+attn_dropout_ratio = 0.25
 # transformer parameters
 hidden_dim = 256
 trf_layers = 1
+trf_dropout_ratio = 0.1
 
 # parameters for trainer
 max_grad_norm = 1.0
@@ -83,7 +84,7 @@ n_epoch = 128
 bilstm_lr = 3e-3
 transformer_lr = 4e-4
 
-# data_names = ['ner_annotations', 'aunpmorph_annotations_fullparas', 'impurityphase_fullparas']
+# data_names = ['ner_annotations', 'aunpmorph_annotations_fullparas', 'impurityphase_fullparas', 'doping']
 data_names = ['ner_annotations']
 
 for data_name in data_names:
@@ -91,9 +92,9 @@ for data_name in data_names:
 
     data = data_tag(data_format(data_path, data_name), format='IOB2')
     # splits = {'_{}'.format(i): [0.1*i, 0.1, 0.1] for i in range(1, 9)}
-    splits = {'': [0.5, .25, 0.25]}
+    splits = {'_lr_adjust': [0.8, .1, 0.1]}
     for alias, split in splits.items():
-        data_save(data_path, data_name, alias, *data_split(data, split, None))
+        data_save(data_path, data_name, alias, *data_split(data, split, seed))
         corpus = DataCorpus(data_path=data_path, data_name=data_name, alias=alias, vector_path=vector_path,
                             tokenizer=tokenizer, cased=cased, batch_size=batch_size, device=device)
 
@@ -157,7 +158,7 @@ for data_name in data_names:
                                     hidden_dim=hidden_dim, output_dim=tag_vocab_size,
                                     trf_layers=trf_layers, attn_heads=attn_heads, use_crf=use_crf,
                                     embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio,
-                                    trf_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
+                                    trf_dropout_ratio=trf_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                                     tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                                     char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
                                     pretrained_embeddings=pretrained_embeddings)
@@ -167,10 +168,10 @@ for data_name in data_names:
         print(m*'-')
 
         # initialize trainer class for bilstm
-        bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=Adam, criterion_cls=nn.CrossEntropyLoss,
+        bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
                                     lr=bilstm_lr, max_grad_norm=max_grad_norm, device=device)
         # initialize trainer class for transformer
-        transformer_trainer = NERTrainer(model=transformer, data=corpus, optimizer_cls=Adam, criterion_cls=nn.CrossEntropyLoss,
+        transformer_trainer = NERTrainer(model=transformer, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
                                          lr=transformer_lr, max_grad_norm=max_grad_norm, device=device)
 
         # bilstm paths
@@ -190,9 +191,6 @@ for data_name in data_names:
                     print('loading model checkpoint')
                     bilstm_trainer.load_model(model_path=bilstm_model_path)
                     bilstm_trainer.load_history(history_path=bilstm_history_path)
-            if lr_schedule:
-                print('scheduling learning rate')
-                bilstm_trainer.schedule_lr()
             bilstm_trainer.train(n_epoch=n_epoch)
             bilstm_trainer.save_model(model_path=bilstm_model_path)
             bilstm_trainer.save_history(history_path=bilstm_history_path)
@@ -204,9 +202,6 @@ for data_name in data_names:
                     print('loading model checkpoint')
                     transformer_trainer.load_model(model_path=transformer_model_path)
                     transformer_trainer.load_history(history_path=transformer_history_path)
-            if lr_schedule:
-                print('scheduling learning rate')
-                transformer_trainer.schedule_lr()
             transformer_trainer.train(n_epoch=n_epoch)
             transformer_trainer.save_model(model_path=transformer_model_path)
             transformer_trainer.save_history(history_path=transformer_history_path)
