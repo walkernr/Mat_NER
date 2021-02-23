@@ -30,7 +30,7 @@ class NERModel(nn.Module):
                  embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings):
+                 pretrained_embeddings, crf_penalties, tag_format):
         '''
 
         basic class for named entity recognition models. inherits from neural network module.
@@ -77,6 +77,9 @@ class NERModel(nn.Module):
         self.pad_token = pad_token
         # pretrained word embeddings
         self.pretrained_embeddings = pretrained_embeddings
+        # crf penalties
+        self.crf_penalties = crf_penalties
+        self.tag_format = tag_format
     
 
     def init_weights(self):
@@ -90,7 +93,16 @@ class NERModel(nn.Module):
         for idx in (self.text_unk_idx, self.text_pad_idx):
             self.embedding.weight.data[idx] = torch.zeros(self.embedding_dim)
         if self.pretrained_embeddings is not None:
-            self.embedding = nn.Embedding.from_pretrained(embeddings=torch.as_tensor(self.pretrained_embeddings), padding_idx=self.text_pad_idx, freeze=True)            
+            self.embedding = nn.Embedding.from_pretrained(embeddings=torch.as_tensor(self.pretrained_embeddings), padding_idx=self.text_pad_idx, freeze=True)
+
+
+    def init_crf(self):
+        self.crf.crf.reset_parameters()
+        if self.crf_penalties:
+            # construct definitions of invalid transitions
+            self.crf.define_invalid_crf_transitions()
+            # initialize transitions
+            self.crf.init_crf_transitions()       
 
 
     def count_parameters(self):
@@ -108,7 +120,7 @@ class BiLSTM_NER(NERModel):
                  attn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings):
+                 pretrained_embeddings, crf_penalties, tag_format):
         '''
 
         BiLSTM model for named entity recognition. inherits from named recognition model
@@ -146,7 +158,7 @@ class BiLSTM_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings)
+                         pretrained_embeddings, crf_penalties, tag_format)
         # network structure settings
         self.lstm_layers = lstm_layers
         # dropout ratios
@@ -157,6 +169,8 @@ class BiLSTM_NER(NERModel):
         self.init_weights()
         # initialize model embeddings
         self.init_embeddings()
+        if self.use_crf:
+            self.init_crf()
 
 
     def build_model_layers(self):
@@ -177,7 +191,6 @@ class BiLSTM_NER(NERModel):
                                       groups=self.char_embedding_dim)
             self.cnn_dropout = nn.Dropout(self.cnn_dropout_ratio)
             all_embedding_dim = self.embedding_dim+(self.char_embedding_dim*self.char_filter)
-            # lstm layers with dropout
         else:
             all_embedding_dim = self.embedding_dim
         # lstm layers with dropout
@@ -193,7 +206,7 @@ class BiLSTM_NER(NERModel):
         self.fc = nn.Linear(self.hidden_dim*2, self.output_dim)
         # use crf layer if it is switched on
         if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names)            
+            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_format)            
     
 
     def forward(self, sentence, characters, tags):
@@ -248,7 +261,7 @@ class Transformer_NER(NERModel):
                  fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings):
+                 pretrained_embeddings, crf_penalties, tag_format):
         '''
 
         Transformer model for named entity recognition. inherits from neural network module
@@ -284,7 +297,7 @@ class Transformer_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings)
+                         pretrained_embeddings, crf_penalties, tag_format)
         # network structure settings
         self.trf_layers = trf_layers
         # dropout ratios
@@ -295,6 +308,9 @@ class Transformer_NER(NERModel):
         self.init_weights()
         # initialize model embeddings
         self.init_embeddings()
+        # initialize model embeddings
+        if self.use_crf:
+            self.init_crf()
 
 
     def build_model_layers(self):
@@ -333,7 +349,7 @@ class Transformer_NER(NERModel):
         self.fc2 = nn.Linear(self.hidden_dim, self.output_dim)
         # use crf layer if it is switched on
         if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names)
+            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_format)
     
 
     def forward(self, sentence, characters, tags):

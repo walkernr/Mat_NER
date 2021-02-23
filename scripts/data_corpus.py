@@ -7,13 +7,14 @@ from torchtext.vocab import Vocab
 
 
 class DataCorpus(object):
-    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, batch_size, device):
+    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, tag_format, batch_size, device):
         self.data_path = data_path
         self.data_name = data_name
         self.alias = alias
         self.vector_path = vector_path
         self.tokenizer = tokenizer
         self.cased = cased
+        self.tag_format = tag_format
         self.batch_size = batch_size
         self.device = device
         self.pad_token = self.tokenizer.pad_token
@@ -54,13 +55,6 @@ class DataCorpus(object):
         self.tag_field.build_vocab(self.train_set.tag)
         self.tag_pad_idx = self.tag_field.vocab.stoi[self.pad_token]
         self.tag_names = self.tag_field.vocab.itos
-        prefixes = set([tag_name[0] for tag_name in self.tag_names if tag_name != self.pad_token])
-        if prefixes == set(['B', 'I', 'O']):
-            self.format = 'IOB2'
-        elif prefixes == set(['B', 'I', 'L', 'U', 'O']):
-            self.format = 'BILOU'
-        elif prefixes == set(['B', 'I', 'E', 'S', 'O']):
-            self.format = 'BIOES'
 
 
     def build_text_vocabulary(self):

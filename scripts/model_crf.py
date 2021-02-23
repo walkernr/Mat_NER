@@ -3,48 +3,53 @@ from torch import nn
 import torchcrf
 
 class CRF(nn.Module):
-    def __init__(self, tag_pad_idx, pad_token, tag_names):
+    def __init__(self, tag_pad_idx, pad_token, tag_names, tag_format):
         super().__init__()
         # tag pad index and tag names
         self.tag_pad_idx = tag_pad_idx
         self.pad_token = pad_token
         self.tag_names = tag_names
+        self.tag_format = tag_format
+        self.prefixes = set([tag_name[0] for tag_name in self.tag_names if tag_name != self.pad_token])
         # initialize CRF
         self.crf = torchcrf.CRF(num_tags=len(self.tag_names), batch_first=True)
-        # construct definitions of invalid transitions
-        self.define_invalid_crf_transitions()
-        # initialize transitions
-        self.init_crf_transitions()
     
 
     def define_invalid_crf_transitions(self):
         ''' function for establishing valid tagging transitions, assumes BIO or BILUO tagging '''
-        self.prefixes = set([tag_name[0] for tag_name in self.tag_names if tag_name != self.pad_token])
-        if self.prefixes == set(['B', 'I', 'O']):
+        if self.tag_format == 'IOB':
+            # (B)eginning (I)nside (O)utside
+            # all beginnings are valid
+            self.invalid_begin = ()
+            # cannot end sentence with B (beginning)
+            self.invalid_end = ('B',)
+            # prevent B (beginning) going to B (beginning) or O (outside) - B must be followed by I
+            self.invalid_transitions_position = {'B': 'BO'}
+            # prevent B (beginning) going to I (inside) or B (beginning) of a different type
+            self.invalid_transitions_tags = {'B': 'IB'}
+        if self.tag_format == 'IOB2':
             # (B)eginning (I)nside (O)utside
             # cannot begin sentence with I (inside), only B (beginning) or O (outside)
             self.invalid_begin = ('I',)
-            # cannot end sentence with B (beginning) or I (inside) - assumes data ends with O (outside), such as punctuation
-            self.invalid_end = ()  # ('B', 'I')
-            # prevent B (beginning) going to P - B must be followed by B, I, or O
-            # prevent I (inside) going to P - I must be followed by B, I, or O
+            # all endings are valid
+            self.invalid_end = ()
             # prevent O (outside) going to I (inside) - O must be followed by B or O
             self.invalid_transitions_position = {'O': 'I'}
             # prevent B (beginning) going to I (inside) of a different type
             # prevent I (inside) going to I (inside) of a different type
             self.invalid_transitions_tags = {'B': 'I',
                                              'I': 'I'}
-        if self.prefixes == set(['B', 'I', 'L', 'U', 'O']):
+        if self.tag_format == 'BILOU':
             # (B)eginning (I)nside (L)ast (U)nit (O)utside
             # cannot begin sentence with I (inside) or L (last)
             self.invalid_begin = ('I', 'L')
             # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ()  # ('B', 'I')
-            # prevent B (beginning) going to B (beginning), O (outside), U (unit), or P - B must be followed by I or L
-            # prevent I (inside) going to B (beginning), O (outside), U (unit), or P - I must be followed by I or L
-            # prevent L (last) going to I (inside) or L(last) - U must be followed by B, O, U, or P
-            # prevent U (unit) going to I (inside) or L(last) - U must be followed by B, O, U, or P
-            # prevent O (outside) going to I (inside) or L (last) - O must be followed by B, O, U, or P
+            self.invalid_end = ('B', 'I')
+            # prevent B (beginning) going to B (beginning), O (outside), or U (unit) - B must be followed by I or L
+            # prevent I (inside) going to B (beginning), O (outside), or U (unit) - I must be followed by I or L
+            # prevent L (last) going to I (inside) or L(last) - U must be followed by B, O, or U
+            # prevent U (unit) going to I (inside) or L(last) - U must be followed by B, O, or U
+            # prevent O (outside) going to I (inside) or L (last) - O must be followed by B, O, or U
             self.invalid_transitions_position = {'B': 'BOU',
                                                  'I': 'BOU',
                                                  'L': 'IL',
@@ -54,17 +59,17 @@ class CRF(nn.Module):
             # prevent I (inside) from going to I (inside) or L (last) of a different tpye
             self.invalid_transitions_tags = {'B': 'IL',
                                              'I': 'IL'}
-        if self.prefixes == set(['B', 'I', 'E', 'S', 'O']):
+        if self.tag_format == 'BIOES':
             # (B)eginning (I)nside (E)nd (S)ingle (O)utside
             # cannot begin sentence with I (inside) or E (end)
             self.invalid_begin = ('I', 'E')
             # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ()  # ('B', 'I')
-            # prevent B (beginning) going to B (beginning), O (outside), S (single), or P - B must be followed by I or E
-            # prevent I (inside) going to B (beginning), O (outside), S (single), or P - I must be followed by I or E
-            # prevent E (end) going to I (inside) or E (end) - U must be followed by B, O, U, or P
-            # prevent S (single) going to I (inside) or E (end) - U must be followed by B, O, U, or P
-            # prevent O (outside) going to I (inside) or E (end) - O must be followed by B, O, U, or P
+            self.invalid_end = ('B', 'I')
+            # prevent B (beginning) going to B (beginning), O (outside), or S (single) - B must be followed by I or E
+            # prevent I (inside) going to B (beginning), O (outside), or S (single) - I must be followed by I or E
+            # prevent E (end) going to I (inside) or E (end) - U must be followed by B, O, or U
+            # prevent S (single) going to I (inside) or E (end) - U must be followed by B, O, or U
+            # prevent O (outside) going to I (inside) or E (end) - O must be followed by B, O, or U
             self.invalid_transitions_position = {'B': 'BOS',
                                                  'I': 'BOS',
                                                  'E': 'IE',

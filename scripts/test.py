@@ -53,6 +53,7 @@ vector_path = (Path(__file__).parent / '../model/mat2vec/pretrained_embeddings')
 tokenizer = MaterialsTextTokenizer(phraser_path=phraser_path)
 
 # corpus parameters
+sentence_level = True
 cased = True
 batch_size = 32
 
@@ -78,25 +79,34 @@ hidden_dim = 256
 trf_layers = 1
 trf_dropout_ratio = 0.1
 
+# crf parameters
+crf_penalties = True
+
 # parameters for trainer
 max_grad_norm = 1.0
 n_epoch = 128
-bilstm_lr = 3e-3
-transformer_lr = 4e-4
+bilstm_lr = 1e-2
+transformer_lr = 1e-2
+
+# training, validation, testing split
+split = (0.8, 0.1, 0.1)
 
 # data_names = ['ner_annotations', 'aunpmorph_annotations_fullparas', 'impurityphase_fullparas', 'doping']
 data_names = ['ner_annotations']
 
 for data_name in data_names:
     data_path = (Path(__file__).parent / '../data/{}'.format(data_name)).resolve().as_posix()
-
-    data = data_tag(data_format(data_path, data_name), format='IOB2')
-    # splits = {'_{}'.format(i): [0.1*i, 0.1, 0.1] for i in range(1, 9)}
-    splits = {'_lr_adjust': [0.8, .1, 0.1]}
-    for alias, split in splits.items():
+    # splits = {'_sentence_level_with_penalties_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-3},
+    #           '_sentence_level_without_penalties_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-3},
+    #           '_sentence_level_with_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-2},
+    #           '_sentence_level_without_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-2}}
+    splits = {'_sentence_level_with_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-2},
+              '_sentence_level_without_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-2}}
+    for alias, config in splits.items():
+        data = data_tag(data_format(data_path, data_name, config['sentence_level']), format=config['format'])
         data_save(data_path, data_name, alias, *data_split(data, split, seed))
         corpus = DataCorpus(data_path=data_path, data_name=data_name, alias=alias, vector_path=vector_path,
-                            tokenizer=tokenizer, cased=cased, batch_size=batch_size, device=device)
+                            tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
 
         embedding_dim = corpus.embedding_dim
         text_vocab_size = len(corpus.text_field.vocab)
@@ -127,7 +137,7 @@ for data_name in data_names:
         pretrained_embeddings = corpus.text_field.vocab.vectors
 
         try:
-            CRF(tag_pad_idx, pad_token, tag_names)
+            CRF(tag_pad_idx, pad_token, tag_names, config['format'])
             use_crf = True
             print('using crf for models')
         except:
@@ -145,7 +155,7 @@ for data_name in data_names:
                             attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                             tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                             char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                            pretrained_embeddings=pretrained_embeddings)
+                            pretrained_embeddings=pretrained_embeddings, crf_penalties=config['crf_penalties'], tag_format=config['format'])
         # print bilstm information
         print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
         print(bilstm)
@@ -161,7 +171,7 @@ for data_name in data_names:
                                     trf_dropout_ratio=trf_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                                     tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                                     char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                                    pretrained_embeddings=pretrained_embeddings)
+                                    pretrained_embeddings=pretrained_embeddings, crf_penalties=config['crf_penalties'], tag_format=config['format'])
         # print transformer information
         print('Transformer model initialized with {} trainable parameters'.format(transformer.count_parameters()))
         print(transformer)
@@ -169,10 +179,10 @@ for data_name in data_names:
 
         # initialize trainer class for bilstm
         bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                    lr=bilstm_lr, max_grad_norm=max_grad_norm, device=device)
+                                    lr=config['lr'], max_grad_norm=max_grad_norm, device=device)
         # initialize trainer class for transformer
         transformer_trainer = NERTrainer(model=transformer, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                         lr=transformer_lr, max_grad_norm=max_grad_norm, device=device)
+                                         lr=config['lr'], max_grad_norm=max_grad_norm, device=device)
 
         # bilstm paths
         bilstm_history_path = Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)
@@ -238,6 +248,7 @@ for data_name in data_names:
                 'Transformer': (0.5, transformer_hist)}
         quant = ['Loss', 'Accuracy Score', 'F1 Score']
         phase = ['Training', 'Validation']
+        limits = {'loss': (0.0, 1500.0),'accuracy_score': (0.0, 1.0), 'f1_score': (0.0, 1.0)}
         # initialize figure and axes
         fig, axs = plt.subplots(3, 2)
         # plot losses
@@ -254,6 +265,7 @@ for data_name in data_names:
                 ax.yaxis.set_ticks_position('left')
                 for key, val in hist.items():
                     ax.plot(val[1][pk][qk].mean(1), color=cm(val[0]), label=key)
+                ax.set_ylim(*limits[qk])
                 if 'Loss' in quant[i]:
                     loc = 'upper right'
                 else:

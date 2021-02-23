@@ -82,7 +82,7 @@ class NERTrainer(object):
     def load_history(self, history_path):
         ''' load training histories from file '''
         self.epoch_metrics = torch.load(history_path)
-        self.past_epoch = len(self.metrics['train'])
+        self.past_epoch = len(self.epoch_metrics['training'])
 
 
     def get_history(self):
@@ -109,7 +109,7 @@ class NERTrainer(object):
         # initialize lists for batch losses and metrics
         metrics = {'loss': [], 'accuracy_score': [], 'f1_score': []}
         # initialize mode for metrics
-        if self.data.format == 'BILOU' or self.data.format == 'BIOES':
+        if self.data.tag_format == 'BILOU' or self.data.tag_format == 'BIOES':
             metric_mode = 'strict'
         else:
             metric_mode = None
@@ -188,7 +188,7 @@ class NERTrainer(object):
             with torch.no_grad():
                 # evaluate all of the batches and collect the batch/epoch loss/metrics
                 metrics = self.iterate_batches(epoch, n_epoch, iterator, train, mode)
-                if epoch >= int(np.floor(0.72*n_epoch)):
+                if epoch >= int(np.floor(0.72*n_epoch)) and mode != 'test':
                     self.lr_scheduler.step()
         # return batch/epoch loss/metrics
         return metrics

@@ -3,12 +3,15 @@ import random
 import numpy as np
 
 
-def data_format(data_path, data_name):
+def data_format(data_path, data_name, sentence_level=True):
     data = []
     with open(data_path+'/original/'+data_name+'.json', 'r') as f:
         for line in f:
             d = json.loads(line)
-            dat = [{'text': [token['text'] for token in sentence], 'annotation': [token['annotation'] for token in sentence]} for sentence in d['tokens']]
+            if sentence_level:
+                dat = [{'text': [token['text'] for token in sentence], 'annotation': [token['annotation'] for token in sentence]} for sentence in d['tokens']]
+            else:
+                dat = [{key : [token[key] for sentence in d['tokens'] for token in sentence] for key in ['text', 'annotation']}]
             data.extend(dat)
     return data
 
@@ -18,6 +21,22 @@ def data_tag(data, format):
         annotation = dat['annotation']
         dat['tag'] = []
         for i in range(len(annotation)):
+            if format == 'IOB':
+                if annotation[i] in [None, 'PVL', 'PUT']:
+                    dat['tag'].append('O')
+                elif i == 0:
+                    if annotation[i+1] == annotation[i]:
+                        dat['tag'].append('B-'+annotation[i])
+                    else:
+                        dat['tag'].append('I-'+annotation[i])
+                elif i > 0:
+                    if annotation[i-1] == annotation[i]:
+                        dat['tag'].append('I-'+annotation[i])
+                    else:
+                        if annotation[i+1] == annotation[i]:
+                            dat['tag'].append('B-'+annotation[i])
+                        else:
+                            dat['tag'].append('I-'+annotation[i])
             if format == 'IOB2':
                 if annotation[i] in [None, 'PVL', 'PUT']:
                     dat['tag'].append('O')
@@ -29,7 +48,7 @@ def data_tag(data, format):
                     else:
                         dat['tag'].append('B-'+annotation[i])
             if format == 'BILOU':
-                if annotation[i] == None:
+                if annotation[i] in [None, 'PVL', 'PUT']:
                     dat['tag'].append('O')
                 elif i == 0:
                     if annotation[i+1] == annotation[i]:
@@ -45,13 +64,13 @@ def data_tag(data, format):
                         dat['tag'].append('L-'+annotation[i])
                     if annotation[i-1] != annotation[i] and annotation[i+1] != annotation[i]:
                         dat['tag'].append('U-'+annotation[i])
-                elif i == len(annotation):
+                elif i == len(annotation)-1:
                     if annotation[i-1] == annotation[i]:
                         dat['tag'].append('L-'+annotation[i])
                     if annotation[i-1] != annotation[i]:
                         dat['tag'].append('U-'+annotation[i])
             if format == 'BIOES':
-                if annotation[i] == None:
+                if annotation[i] in [None, 'PVL', 'PUT']:
                     dat['tag'].append('O')
                 elif i == 0:
                     if annotation[i+1] == annotation[i]:
@@ -67,7 +86,7 @@ def data_tag(data, format):
                         dat['tag'].append('E-'+annotation[i])
                     if annotation[i-1] != annotation[i] and annotation[i+1] != annotation[i]:
                         dat['tag'].append('S-'+annotation[i])
-                elif i == len(annotation):
+                elif i == len(annotation)-1:
                     if annotation[i-1] == annotation[i]:
                         dat['tag'].append('E-'+annotation[i])
                     if annotation[i-1] != annotation[i]:
