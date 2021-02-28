@@ -16,8 +16,8 @@ class CRF(nn.Module):
     
 
     def define_invalid_crf_transitions(self):
-        ''' function for establishing valid tagging transitions, assumes BIO or BILUO tagging '''
-        if self.tag_format == 'IOB':
+        ''' function for establishing valid tagging transitions, assumes IOB1, IOB2, or IOBES tagging '''
+        if self.tag_format == 'IOB1':
             # (B)eginning (I)nside (O)utside
             # all beginnings are valid
             self.invalid_begin = ()
@@ -27,7 +27,7 @@ class CRF(nn.Module):
             self.invalid_transitions_position = {'B': 'BO'}
             # prevent B (beginning) going to I (inside) or B (beginning) of a different type
             self.invalid_transitions_tags = {'B': 'IB'}
-        if self.tag_format == 'IOB2':
+        elif self.tag_format == 'IOB2':
             # (B)eginning (I)nside (O)utside
             # cannot begin sentence with I (inside), only B (beginning) or O (outside)
             self.invalid_begin = ('I',)
@@ -39,28 +39,8 @@ class CRF(nn.Module):
             # prevent I (inside) going to I (inside) of a different type
             self.invalid_transitions_tags = {'B': 'I',
                                              'I': 'I'}
-        if self.tag_format == 'BILOU':
-            # (B)eginning (I)nside (L)ast (U)nit (O)utside
-            # cannot begin sentence with I (inside) or L (last)
-            self.invalid_begin = ('I', 'L')
-            # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ('B', 'I')
-            # prevent B (beginning) going to B (beginning), O (outside), or U (unit) - B must be followed by I or L
-            # prevent I (inside) going to B (beginning), O (outside), or U (unit) - I must be followed by I or L
-            # prevent L (last) going to I (inside) or L(last) - U must be followed by B, O, or U
-            # prevent U (unit) going to I (inside) or L(last) - U must be followed by B, O, or U
-            # prevent O (outside) going to I (inside) or L (last) - O must be followed by B, O, or U
-            self.invalid_transitions_position = {'B': 'BOU',
-                                                 'I': 'BOU',
-                                                 'L': 'IL',
-                                                 'U': 'IL',
-                                                 'O': 'IL'}
-            # prevent B (beginning) from going to I (inside) or L (last) of a different type
-            # prevent I (inside) from going to I (inside) or L (last) of a different tpye
-            self.invalid_transitions_tags = {'B': 'IL',
-                                             'I': 'IL'}
-        if self.tag_format == 'BIOES':
-            # (B)eginning (I)nside (E)nd (S)ingle (O)utside
+        elif self.tag_format == 'IOBES':
+            # (I)nside (O)utside (B)eginning (E)nd (S)ingle 
             # cannot begin sentence with I (inside) or E (end)
             self.invalid_begin = ('I', 'E')
             # cannot end sentence with B (beginning) or I (inside)
@@ -81,7 +61,7 @@ class CRF(nn.Module):
                                              'I': 'IE'}
     
 
-    def init_crf_transitions(self, imp_value=-100):
+    def init_crf_transitions(self, imp_value=-10000):
         num_tags = len(self.tag_names)
         # penalize bad beginnings and endings
         for i in range(num_tags):
@@ -116,5 +96,5 @@ class CRF(nn.Module):
         mask = tags != self.tag_pad_idx
         # compute output and loss
         crf_out = self.crf.decode(fc_out, mask=mask)
-        crf_loss = -self.crf(fc_out, tags=tags, mask=mask)
+        crf_loss = -self.crf(fc_out, tags=tags, mask=mask, reduction='mean')
         return crf_out, crf_loss

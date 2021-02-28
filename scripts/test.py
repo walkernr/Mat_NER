@@ -79,33 +79,90 @@ hidden_dim = 256
 trf_layers = 1
 trf_dropout_ratio = 0.1
 
-# crf parameters
-crf_penalties = True
-
 # parameters for trainer
 max_grad_norm = 1.0
-n_epoch = 128
-bilstm_lr = 1e-2
-transformer_lr = 1e-2
+n_epoch = 32
 
 # training, validation, testing split
 split = (0.8, 0.1, 0.1)
 
 # data_names = ['ner_annotations', 'aunpmorph_annotations_fullparas', 'impurityphase_fullparas', 'doping']
-data_names = ['ner_annotations']
+data_names = ['ner_annotations', 'doping']
 
 for data_name in data_names:
     data_path = (Path(__file__).parent / '../data/{}'.format(data_name)).resolve().as_posix()
-    # splits = {'_sentence_level_with_penalties_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-3},
-    #           '_sentence_level_without_penalties_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-3},
-    #           '_sentence_level_with_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-2},
-    #           '_sentence_level_without_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-2}}
-    splits = {'_sentence_level_with_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': True, 'lr': 1e-2},
-              '_sentence_level_without_penalties_high_lr_bioes': {'sentence_level': True, 'format': 'BIOES', 'crf_penalties': False, 'lr': 1e-2}}
+    # splits = {'_sentence_level_crf_decode_penalties_iobes_{}'.format(seed): {'sentence_level': True,
+    #                                                                          'format': 'IOBES',
+    #                                                                          'use_crf': True,
+    #                                                                          'crf_decode': True,
+    #                                                                          'crf_penalties': True,
+    #                                                                          'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_decode_penalties_iob2_{}'.format(seed): {'sentence_level': True,
+    #                                                                         'format': 'IOB2',
+    #                                                                         'use_crf': True,
+    #                                                                         'crf_decode': True,
+    #                                                                         'crf_penalties': True,
+    #                                                                         'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_decode_no_penalties_iobes_{}'.format(seed): {'sentence_level': True,
+    #                                                                             'format': 'IOBES',
+    #                                                                             'use_crf': True,
+    #                                                                             'crf_decode': True,
+    #                                                                             'crf_penalties': False,
+    #                                                                             'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_decode_no_penalties_iob2_{}'.format(seed): {'sentence_level': True,
+    #                                                                            'format': 'IOB2',
+    #                                                                            'use_crf': True,
+    #                                                                            'crf_decode': True,
+    #                                                                            'crf_penalties': False,
+    #                                                                            'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_no_decode_penalties_iobes_{}'.format(seed): {'sentence_level': True,
+    #                                                                             'format': 'IOBES',
+    #                                                                             'use_crf': True,
+    #                                                                             'crf_decode': False,
+    #                                                                             'crf_penalties': True,
+    #                                                                             'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_no_decode_penalties_iob2_{}'.format(seed): {'sentence_level': True,
+    #                                                                            'format': 'IOB2',
+    #                                                                            'use_crf': True,
+    #                                                                            'crf_decode': False,
+    #                                                                            'crf_penalties': True,
+    #                                                                            'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_no_decode_no_penalties_iobes_{}'.format(seed): {'sentence_level': True,
+    #                                                                                'format': 'IOBES',
+    #                                                                                'use_crf': True,
+    #                                                                                'crf_decode': False,
+    #                                                                                'crf_penalties': False,
+    #                                                                                'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_crf_no_decode_no_penalties_iob2_{}'.format(seed): {'sentence_level': True,
+    #                                                                               'format': 'IOB2',
+    #                                                                               'use_crf': True,
+    #                                                                               'crf_decode': False,
+    #                                                                               'crf_penalties': False,
+    #                                                                               'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_no_crf_iobes_{}'.format(seed): {'sentence_level': True,
+    #                                                            'format': 'IOBES',
+    #                                                            'use_crf': False,
+    #                                                            'crf_decode': False,
+    #                                                            'crf_penalties': False,
+    #                                                            'lr': {'bilstm': 1e-3, 'transformer': 1e-4}},
+    #           '_sentence_level_no_crf_iob2_{}'.format(seed): {'sentence_level': True,
+    #                                                           'format': 'IOB2',
+    #                                                           'use_crf': False,
+    #                                                           'crf_decode': False,
+    #                                                           'crf_penalties': False,
+    #                                                           'lr': {'bilstm': 1e-3, 'transformer': 1e-4}}}
+    lr_list = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+    splits = {'_sentence_level_crf_decode_penalties_iobes_{}_{}'.format(seed, lr): {'sentence_level': True,
+                                                                                    'format': 'IOBES',
+                                                                                    'use_crf': True,
+                                                                                    'crf_decode': True,
+                                                                                    'crf_penalties': True,
+                                                                                    'lr': {'bilstm': lr, 'transformer': lr}} for lr in lr_list}
+              
     for alias, config in splits.items():
-        data = data_tag(data_format(data_path, data_name, config['sentence_level']), format=config['format'])
-        data_save(data_path, data_name, alias, *data_split(data, split, seed))
-        corpus = DataCorpus(data_path=data_path, data_name=data_name, alias=alias, vector_path=vector_path,
+        data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
+        data_save(data_path, data_name, '_{}'.format(seed), *data_split(data, split, seed))
+        corpus = DataCorpus(data_path=data_path, data_name=data_name, alias='_{}'.format(seed), vector_path=vector_path,
                             tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
 
         embedding_dim = corpus.embedding_dim
@@ -136,26 +193,17 @@ for data_name in data_names:
         pad_token = corpus.pad_token
         pretrained_embeddings = corpus.text_field.vocab.vectors
 
-        try:
-            CRF(tag_pad_idx, pad_token, tag_names, config['format'])
-            use_crf = True
-            print('using crf for models')
-        except:
-            use_crf = False
-            print('not using crf for models (incompatible tagging format)')
-        print(m*'-')
-
         # initialize bilstm
         bilstm = BiLSTM_NER(input_dim=text_vocab_size, embedding_dim=embedding_dim,
                             char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,
                             char_filter=char_filter, char_kernel=char_kernel,
                             hidden_dim=hidden_dim, output_dim=tag_vocab_size,
-                            lstm_layers=lstm_layers, attn_heads=attn_heads, use_crf=use_crf,
+                            lstm_layers=lstm_layers, attn_heads=attn_heads, use_crf=config['use_crf'],
                             embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio, lstm_dropout_ratio=lstm_dropout_ratio,
                             attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                             tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                             char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                            pretrained_embeddings=pretrained_embeddings, crf_penalties=config['crf_penalties'], tag_format=config['format'])
+                            pretrained_embeddings=pretrained_embeddings, crf_decode=config['crf_decode'], crf_penalties=config['crf_penalties'], tag_format=config['format'])
         # print bilstm information
         print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
         print(bilstm)
@@ -166,12 +214,12 @@ for data_name in data_names:
                                     char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,
                                     char_filter=char_filter, char_kernel=char_kernel,
                                     hidden_dim=hidden_dim, output_dim=tag_vocab_size,
-                                    trf_layers=trf_layers, attn_heads=attn_heads, use_crf=use_crf,
+                                    trf_layers=trf_layers, attn_heads=attn_heads, use_crf=config['use_crf'],
                                     embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio,
                                     trf_dropout_ratio=trf_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                                     tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                                     char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                                    pretrained_embeddings=pretrained_embeddings, crf_penalties=config['crf_penalties'], tag_format=config['format'])
+                                    pretrained_embeddings=pretrained_embeddings, crf_decode=config['crf_decode'], crf_penalties=config['crf_penalties'], tag_format=config['format'])
         # print transformer information
         print('Transformer model initialized with {} trainable parameters'.format(transformer.count_parameters()))
         print(transformer)
@@ -179,17 +227,19 @@ for data_name in data_names:
 
         # initialize trainer class for bilstm
         bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                    lr=config['lr'], max_grad_norm=max_grad_norm, device=device)
+                                    lr=config['lr']['bilstm'], max_grad_norm=max_grad_norm, device=device)
         # initialize trainer class for transformer
         transformer_trainer = NERTrainer(model=transformer, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                         lr=config['lr'], max_grad_norm=max_grad_norm, device=device)
+                                         lr=config['lr']['transformer'], max_grad_norm=max_grad_norm, device=device)
 
         # bilstm paths
         bilstm_history_path = Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)
+        bilstm_test_path = Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)
         bilstm_model_path = Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)
 
         # transformer paths
         transformer_history_path = Path(__file__).parent / '../model/transformer/history/{}_history.pt'.format(data_name+alias)
+        transformer_test_path = Path(__file__).parent / '../model/transformer/testy/{}_test.pt'.format(data_name+alias)
         transformer_model_path = Path(__file__).parent / '../model/transformer/{}_model.pt'.format(data_name+alias)
 
         # if new_calculation, then train and save the model. otherwise, just load everything from file
@@ -202,6 +252,7 @@ for data_name in data_names:
                     bilstm_trainer.load_model(model_path=bilstm_model_path)
                     bilstm_trainer.load_history(history_path=bilstm_history_path)
             bilstm_trainer.train(n_epoch=n_epoch)
+            bilstm_trainer.load_state_from_cache('best_validation_f1')
             bilstm_trainer.save_model(model_path=bilstm_model_path)
             bilstm_trainer.save_history(history_path=bilstm_history_path)
             print(m*'-')
@@ -213,6 +264,7 @@ for data_name in data_names:
                     transformer_trainer.load_model(model_path=transformer_model_path)
                     transformer_trainer.load_history(history_path=transformer_history_path)
             transformer_trainer.train(n_epoch=n_epoch)
+            transformer_trainer.load_state_from_cache('best_validation_f1')
             transformer_trainer.save_model(model_path=transformer_model_path)
             transformer_trainer.save_history(history_path=transformer_history_path)
             print(m*'-')
@@ -229,10 +281,10 @@ for data_name in data_names:
 
         # evaluate test set
         print('testing BiLSTM')
-        bilstm_trainer.test()
+        bilstm_trainer.test(bilstm_test_path)
         print(m*'-')
         print('testing Transformer')
-        transformer_trainer.test()
+        transformer_trainer.test(transformer_test_path)
         print(m*'-')
 
         bilstm_hist = {'training': {}, 'validation': {}}
@@ -246,9 +298,9 @@ for data_name in data_names:
 
         hist = {'BiLSTM': (0.3, bilstm_hist),
                 'Transformer': (0.5, transformer_hist)}
-        quant = ['Loss', 'Accuracy Score', 'F1 Score']
+        quant = ['Loss', 'Accuracy Score', 'Precision Score', 'Recall Score', 'F1 Score']
         phase = ['Training', 'Validation']
-        limits = {'loss': (0.0, 1500.0),'accuracy_score': (0.0, 1.0), 'f1_score': (0.0, 1.0)}
+        limits = {'loss': (0.0, 50.0),'accuracy_score': (0.0, 1.0), 'precision_score': (0.0, 1.0), 'recall_score': (0.0, 1.0), 'f1_score': (0.0, 1.0)}
         # initialize figure and axes
         fig, axs = plt.subplots(3, 2)
         # plot losses

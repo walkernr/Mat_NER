@@ -10,15 +10,16 @@ class PositionalEncoding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float()*(-math.log(10000.0)/d_model))
+        pe[:, 0::2] = torch.sin(position*div_term)
+        pe[:, 1::2] = torch.cos(position*div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer('pe', pe)
 
+
     def forward(self, x):
         ''' forward operation for network '''
-        x = x + self.pe[:x.size(0), :]
+        x = x+self.pe[:x.size(0), :]
         return self.dropout(x)
 
 
@@ -30,9 +31,8 @@ class NERModel(nn.Module):
                  embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, crf_penalties, tag_format):
+                 pretrained_embeddings, crf_decode, crf_penalties, tag_format):
         '''
-
         basic class for named entity recognition models. inherits from neural network module.
         layers and forward function will be defined by a child class.
 
@@ -49,7 +49,6 @@ class NERModel(nn.Module):
         embedding_dropout_ratio: dropout for embedding layer
         cnn_dropout_ratio: dropout for convolutions over characters
         fc_dropout_ratio: dropout for fully connected layer
-        use_crf: switch for using conditional random field (reduces probability of invalid tagging sequences)
         tag_names: the names of all of the tags in the tag field
         text_pad_idx: index for text padding token
         text_unk_idx: indices for text unknown tokens
@@ -57,7 +56,9 @@ class NERModel(nn.Module):
         tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-
+        crf_decode: switch for using verterbi decoding to find the most probable sequence
+        crf_penalties: switch for penalizing invalid transitions
+        tag_format: tagging format
         '''
         # initialize the superclass
         super().__init__()
@@ -77,6 +78,8 @@ class NERModel(nn.Module):
         self.pad_token = pad_token
         # pretrained word embeddings
         self.pretrained_embeddings = pretrained_embeddings
+        # crf decode
+        self.crf_decode = crf_decode
         # crf penalties
         self.crf_penalties = crf_penalties
         self.tag_format = tag_format
@@ -120,9 +123,8 @@ class BiLSTM_NER(NERModel):
                  attn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, crf_penalties, tag_format):
+                 pretrained_embeddings, crf_decode, crf_penalties, tag_format):
         '''
-
         BiLSTM model for named entity recognition. inherits from named recognition model
 
         input_dim: input dimension (size of text vocabulary)
@@ -148,7 +150,9 @@ class BiLSTM_NER(NERModel):
         tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-
+        crf_decode: switch for using verterbi decoding to find the most probable sequence
+        crf_penalties: switch for penalizing invalid transitions
+        tag_format: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
@@ -158,7 +162,7 @@ class BiLSTM_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, crf_penalties, tag_format)
+                         pretrained_embeddings, crf_decode, crf_penalties, tag_format)
         # network structure settings
         self.lstm_layers = lstm_layers
         # dropout ratios
@@ -245,8 +249,12 @@ class BiLSTM_NER(NERModel):
             # fully connected layer as function of lstm output
             fc_out = self.fc(self.fc_dropout(lstm_out))
         if self.use_crf:
-            crf_out, crf_loss = self.crf(fc_out, tags)
-            return crf_out, crf_loss
+            if self.crf_decode:
+                crf_out, crf_loss = self.crf(fc_out, tags)
+                return crf_out, crf_loss
+            else:
+                _, crf_loss = self.crf(fc_out, tags)
+                return fc_out, crf_loss
         else:
             return fc_out
 
@@ -261,9 +269,8 @@ class Transformer_NER(NERModel):
                  fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, crf_penalties, tag_format):
+                 pretrained_embeddings, crf_decode, crf_penalties, tag_format):
         '''
-
         Transformer model for named entity recognition. inherits from neural network module
 
         input_dim: input dimension (size of text vocabulary)
@@ -287,7 +294,9 @@ class Transformer_NER(NERModel):
         char_pad_idx: indices for character unknown tokens
         tag_pad_idx: index for tag padding token
         pretrained_embeddings: the pretrained word vectors for the dataset
-
+        crf_decode: switch for using verterbi decoding to find the most probable sequence
+        crf_penalties: switch for penalizing invalid transitions
+        tag_format: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
@@ -297,7 +306,7 @@ class Transformer_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, crf_penalties, tag_format)
+                         pretrained_embeddings, crf_decode, crf_penalties, tag_format)
         # network structure settings
         self.trf_layers = trf_layers
         # dropout ratios
@@ -383,7 +392,11 @@ class Transformer_NER(NERModel):
         fc1_out = self.fc1_norm(self.fc1_gelu(self.fc1(enc_out)))
         fc2_out = self.fc2(self.fc2_dropout(fc1_out))
         if self.use_crf:
-            crf_out, crf_loss = self.crf(fc2_out, tags)
-            return crf_out, crf_loss
+            if self.crf_decode:
+                crf_out, crf_loss = self.crf(fc2_out, tags)
+                return crf_out, crf_loss
+            else:
+                _, crf_loss = self.crf(fc2_out, tags)
+                return fc2_out, crf_loss
         else:
             return fc2_out
