@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from seqeval.scheme import IOB1, IOB2, IOBES
-from seqeval.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from seqeval.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
 class StateCacher(object):
@@ -49,7 +49,12 @@ class NERTrainer(object):
         # initialize empty lists for training
         self.epoch_metrics = {'training': {}, 'validation': {}}
         self.metric_mode = 'strict'
-        self.metric_scheme_dict = {'IOB1': IOB1, 'IOB2': IOB2, 'IOBES': IOBES}
+        if self.data.tag_format == 'IOB1':
+            self.metric_scheme = IOB1
+        elif self.data.tag_format == 'IOB2':
+            self.metric_scheme = IOB2
+        elif self.data.tag_format == 'IOBES':
+            self.metric_scheme = IOBES
         self.past_epoch = 0
     
 
@@ -129,7 +134,6 @@ class NERTrainer(object):
                     prediction, loss = self.model(text, char, tag)
                 else:
                     logit, loss = self.model(text, char, tag)
-                    loss = self.criterion(logit.view(-1, logit.shape[-1]), tag.view(-1))
                     logit = logit.detach().cpu().numpy()
                     prediction = [list(p) for p in np.argmax(logit, axis=2)]
             else:
@@ -151,9 +155,9 @@ class NERTrainer(object):
 
             # calculate the accuracy and f1 scores
             accuracy = accuracy_score(valid_tags, prediction_tags)
-            precision = precision_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme_dict[self.data.tag_format])
-            recall = recall_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme_dict[self.data.tag_format])
-            f1 = f1_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme_dict[self.data.tag_format])
+            precision = precision_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme)
+            recall = recall_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme)
+            f1 = f1_score(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme)
 
             # append to the lists
             metrics['loss'].append(loss.item())
@@ -200,7 +204,7 @@ class NERTrainer(object):
             with torch.no_grad():
                 # evaluate all of the batches and collect the batch/epoch loss/metrics
                 metrics = self.iterate_batches(epoch, n_epoch, iterator, mode)
-                if epoch >= int(np.floor(0.72*n_epoch)):
+                if (epoch+1) >= int(np.floor(0.72*n_epoch)) and (epoch+1) < n_epoch:
                     self.lr_scheduler.step()
         elif mode == 'test':
             # make sure the model is set to evaluate if it is evaluating
@@ -243,5 +247,4 @@ class NERTrainer(object):
         ''' evaluates the test set '''
         metrics, prediction_tags, valid_tags = self.train_evaluate_epoch(0, 1, self.data.test_iter, 'test')
         torch.save((metrics, prediction_tags, valid_tags), test_path)
-        classification_report(valid_tags, prediction_tags, mode=self.metric_mode, scheme=self.metric_scheme_dict[self.data.tag_format])
         return metrics, prediction_tags, valid_tags
