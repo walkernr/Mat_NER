@@ -130,12 +130,7 @@ class NERTrainer(object):
 
             # output depends on whether conditional random field is used for prediction/loss
             if self.model.use_crf:
-                if self.model.crf_decode:
-                    prediction, loss = self.model(text, char, tag)
-                else:
-                    logit, loss = self.model(text, char, tag)
-                    logit = logit.detach().cpu().numpy()
-                    prediction = [list(p) for p in np.argmax(logit, axis=2)]
+                prediction, loss = self.model(text, char, tag)
             else:
                 logit = self.model(text, char, tag)
                 loss = self.criterion(logit.view(-1, logit.shape[-1]), tag.view(-1))
