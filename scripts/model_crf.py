@@ -42,23 +42,38 @@ class CRF(nn.Module):
         elif self.tag_format == 'IOBES':
             # (I)nside (O)utside (B)eginning (E)nd (S)ingle 
             # cannot begin sentence with I (inside) or E (end)
-            self.invalid_begin = ('I', 'E')
+            if 'I' in self.prefixes:
+                self.invalid_begin = ('I', 'E')
+            else:
+                self.invalid_begin = ('E',)
             # cannot end sentence with B (beginning) or I (inside)
-            self.invalid_end = ('B', 'I')
+            if 'I' in self.prefixes:
+                self.invalid_end = ('B', 'I')
+            else:
+                self.invalid_end = ('B',)
             # prevent B (beginning) going to B (beginning), O (outside), or S (single) - B must be followed by I or E
             # prevent I (inside) going to B (beginning), O (outside), or S (single) - I must be followed by I or E
             # prevent E (end) going to I (inside) or E (end) - U must be followed by B, O, or U
             # prevent S (single) going to I (inside) or E (end) - U must be followed by B, O, or U
             # prevent O (outside) going to I (inside) or E (end) - O must be followed by B, O, or U
-            self.invalid_transitions_position = {'B': 'BOS',
-                                                 'I': 'BOS',
-                                                 'E': 'IE',
-                                                 'S': 'IE',
-                                                 'O': 'IE'}
+            if 'I' in self.prefixes:
+                self.invalid_transitions_position = {'B': 'BOS',
+                                                     'I': 'BOS',
+                                                     'E': 'IE',
+                                                     'S': 'IE',
+                                                     'O': 'IE'}
+            else:
+                self.invalid_transitions_position = {'B': 'BOS',
+                                                     'E': 'E',
+                                                     'S': 'E',
+                                                     'O': 'E'}
             # prevent B (beginning) from going to I (inside) or E (end) of a different type
             # prevent I (inside) from going to I (inside) or E (end) of a different tpye
-            self.invalid_transitions_tags = {'B': 'IE',
-                                             'I': 'IE'}
+            if 'I' in self.prefixes:
+                self.invalid_transitions_tags = {'B': 'IE',
+                                                 'I': 'IE'}
+            else:
+                self.invalid_transitions_tags = {'B': 'E'}
     
 
     def init_crf_transitions(self, imp_value=-10000):

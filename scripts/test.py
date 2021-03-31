@@ -18,8 +18,8 @@ n, m = subprocess.check_output(['stty', 'size']).decode().split()
 n, m = int(n), int(m)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# seed = 256
-# torch.manual_seed(seed)
+seed = 256
+torch.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 
 new_calculation = True
@@ -62,37 +62,40 @@ max_grad_norm = 1.0
 n_epoch = 64
 
 # training, validation, testing split
-split = np.array((0.8, 0.1, 0.1))*2190/11123
+# split = np.array((0.8, 0.1, 0.1))*2190/11123
+# split = (0.8, 0.1, 0.1)
 
-# data_names = ['ner_annotations', 'aunpmorph_annotations_fullparas', 'impurityphase_fullparas', 'doping']
-data_names = ['ner_annotations']
-seeds = [256]
+data_names = ['solid_state', 'aunpmorph', 'impurityphase', 'doping']
+# data_names = ['aunpmorph']
+seeds = np.arange(100, 115)
 
 for seed in seeds:
     torch.manual_seed(seed)
     for data_name in data_names:
         data_path = (Path(__file__).parent / '../data/{}'.format(data_name)).resolve().as_posix()
         configs = {}
-        configs['_sentence_level_crf_iobes_small_{}'.format(seed)] = {'sentence_level': True,
-                                                                                'format': 'IOBES',
-                                                                                'use_crf': True,
-                                                                                'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        configs['_sentence_level_crf_iob2_small_{}'.format(seed)] = {'sentence_level': True,
-                                                                                'format': 'IOB2',
-                                                                                'use_crf': True,
-                                                                                'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        configs['_sentence_level_no_crf_iobes_small_{}'.format(seed)] = {'sentence_level': True,
-                                                                'format': 'IOBES',
-                                                                'use_crf': False,
-                                                                'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        configs['_sentence_level_no_crf_iob2_small_{}'.format(seed)] = {'sentence_level': True,
-                                                                'format': 'IOB2',
-                                                                'use_crf': False,
-                                                                'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
+        # configs['_crf_iobes_{}'.format(seed)] = {'sentence_level': True,
+        #                                          'format': 'IOBES',
+        #                                          'use_crf': True,
+        #                                          'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+        #                                          'split': split}
+        # configs['_crf_iob2_{}'.format(seed)] = {'sentence_level': True,
+        #                                         'format': 'IOB2',
+        #                                         'use_crf': True,
+        #                                         'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
+        # configs['_logit_iobes_{}'.format(seed)] = {'sentence_level': True,
+        #                                            'format': 'IOBES',
+        #                                            'use_crf': False,
+        #                                            'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
+        # configs['_logit_iob2_{}'.format(seed)] = {'sentence_level': True,
+        #                                           'format': 'IOB2',
+        #                                           'use_crf': False,
+        #                                           'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
+        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 90, 10)}
                 
         for alias, config in configs.items():
             data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
-            data_save(data_path, data_name, '_{}'.format(seed), *data_split(data, split, seed))
+            data_save(data_path, data_name, '_{}'.format(seed), *data_split(data, config['split'], seed))
             corpus = DataCorpus(data_path=data_path, data_name=data_name, alias='_{}'.format(seed), vector_path=vector_path,
                                 tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
 
@@ -184,7 +187,7 @@ for seed in seeds:
                         bilstm_trainer.load_history(history_path=bilstm_history_path)
                 bilstm_trainer.train(n_epoch=n_epoch)
                 bilstm_trainer.load_state_from_cache('best_validation_f1')
-                bilstm_trainer.save_model(model_path=bilstm_model_path)
+                # bilstm_trainer.save_model(model_path=bilstm_model_path)
                 bilstm_trainer.save_history(history_path=bilstm_history_path)
                 print(m*'-')
                 # print('training Transformer model')
