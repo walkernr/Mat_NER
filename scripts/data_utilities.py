@@ -93,7 +93,9 @@ def data_split(data, splits, seed):
     seed: random seed for shuffling
     '''
     splits = (np.cumsum(splits)*len(data)).astype(np.uint16)
-    random.Random(seed).shuffle(data)
+    np.random.seed(seed)
+    np.random.shuffle(data)
+    # random.Random(seed).shuffle(data)
     test_set = data[:splits[0]]
     valid_set = data[splits[0]:splits[1]]
     train_set = data[splits[1]:splits[2]]

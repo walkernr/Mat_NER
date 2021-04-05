@@ -63,35 +63,39 @@ n_epoch = 64
 
 # training, validation, testing split
 # split = np.array((0.8, 0.1, 0.1))*2190/11123
-# split = (0.8, 0.1, 0.1)
+split = (0.1, 0.1, 0.8)
 
-data_names = ['solid_state', 'aunpmorph', 'impurityphase', 'doping']
-# data_names = ['aunpmorph']
-seeds = np.arange(100, 115)
+# data_names = ['solid_state', 'aunpmorph', 'impurityphase', 'doping']
+data_names = ['solid_state']
+# seeds = np.arange(100, 115)
+seeds = [seed]
 
 for seed in seeds:
     torch.manual_seed(seed)
     for data_name in data_names:
         data_path = (Path(__file__).parent / '../data/{}'.format(data_name)).resolve().as_posix()
         configs = {}
-        # configs['_crf_iobes_{}'.format(seed)] = {'sentence_level': True,
-        #                                          'format': 'IOBES',
-        #                                          'use_crf': True,
-        #                                          'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
-        #                                          'split': split}
-        # configs['_crf_iob2_{}'.format(seed)] = {'sentence_level': True,
-        #                                         'format': 'IOB2',
-        #                                         'use_crf': True,
-        #                                         'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        # configs['_logit_iobes_{}'.format(seed)] = {'sentence_level': True,
-        #                                            'format': 'IOBES',
-        #                                            'use_crf': False,
-        #                                            'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        # configs['_logit_iob2_{}'.format(seed)] = {'sentence_level': True,
-        #                                           'format': 'IOB2',
-        #                                           'use_crf': False,
-        #                                           'lr': {'bilstm': 5e-2, 'transformer': 5e-2}}
-        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 90, 10)}
+        configs['_crf_iobes_{}'.format(seed)] = {'sentence_level': True,
+                                                 'format': 'IOBES',
+                                                 'use_crf': True,
+                                                 'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+                                                 'split': split}
+        configs['_crf_iob2_{}'.format(seed)] = {'sentence_level': True,
+                                                'format': 'IOB2',
+                                                'use_crf': True,
+                                                'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+                                                'split': split}
+        configs['_logit_iobes_{}'.format(seed)] = {'sentence_level': True,
+                                                   'format': 'IOBES',
+                                                   'use_crf': False,
+                                                   'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+                                                   'split': split}
+        configs['_logit_iob2_{}'.format(seed)] = {'sentence_level': True,
+                                                  'format': 'IOB2',
+                                                  'use_crf': False,
+                                                  'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+                                                  'split': split}
+        # configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 90, 10)}
                 
         for alias, config in configs.items():
             data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
