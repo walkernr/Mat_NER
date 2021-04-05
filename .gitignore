@@ -1,6 +1,7 @@
 data/*/split/*.tsv
 model/scibert
 model/matbert
+model/bert
 model/*/*.pt
 model/*/history/*.pt
 scripts/plot*.py
