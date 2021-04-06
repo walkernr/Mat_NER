@@ -148,7 +148,7 @@ for data_name in data_names:
 
             # initialize trainer class for bilstm
             bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                        lr=config['lr']['bilstm'], max_grad_norm=max_grad_norm, device=device)
+                                        lr=config['lr'], max_grad_norm=max_grad_norm, device=device)
 
             # bilstm paths
             bilstm_history_path = Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)
