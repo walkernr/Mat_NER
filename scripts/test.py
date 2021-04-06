@@ -71,9 +71,9 @@ data_names = ['solid_state', 'aunpmorph', 'doping']
 seeds = np.arange(100, 115)
 # seeds = [seed]
 
-for seed in seeds:
-    torch.manual_seed(seed)
-    for data_name in data_names:
+for data_name in data_names:
+    for seed in seeds:
+        torch.manual_seed(seed)
         data_path = (Path(__file__).parent / '../data/{}'.format(data_name)).resolve().as_posix()
         # configs = {}
         # configs['_crf_iobes_{}'.format(seed)] = {'sentence_level': True,
@@ -192,7 +192,7 @@ for seed in seeds:
                         bilstm_trainer.load_history(history_path=bilstm_history_path)
                 bilstm_trainer.train(n_epoch=n_epoch)
                 bilstm_trainer.load_state_from_cache('best_validation_f1')
-                # bilstm_trainer.save_model(model_path=bilstm_model_path)
+                bilstm_trainer.save_model(model_path=bilstm_model_path)
                 bilstm_trainer.save_history(history_path=bilstm_history_path)
                 print(m*'-')
                 # print('training Transformer model')

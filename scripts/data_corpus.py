@@ -52,7 +52,7 @@ class DataCorpus(object):
 
 
     def build_tag_vocabulary(self):
-        self.tag_field.build_vocab(self.train_set.tag)
+        self.tag_field.build_vocab([t for t in self.train_set.tag]+[t for t in self.valid_set.tag]+[t for t in self.test_set.tag])
         self.tag_pad_idx = self.tag_field.vocab.stoi[self.pad_token]
         self.tag_names = self.tag_field.vocab.itos
 
