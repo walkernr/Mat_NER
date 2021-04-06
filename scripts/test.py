@@ -96,7 +96,7 @@ for seed in seeds:
         #                                           'use_crf': False,
         #                                           'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
         #                                           'split': split}
-        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 90, 10)}
+        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 85, 5)}
                 
         for alias, config in configs.items():
             data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
