@@ -61,8 +61,7 @@ trf_dropout_ratio = 0.1
 max_grad_norm = 1.0
 n_epoch = 64
 
-# training, validation, testing split
-# split = np.array((0.8, 0.1, 0.1))*2190/11123
+# training, validation, testing spli
 split = (0.1, 0.1, 0.8)
 
 # data_names = ['solid_state', 'aunpmorph', 'impurityphase', 'doping']

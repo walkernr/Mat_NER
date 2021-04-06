@@ -212,7 +212,7 @@ class BiLSTM_NER(NERModel):
         if self.char_embedding_dim:
             char_embedding_out = self.embedding_dropout(self.char_embedding(characters))
             batch_size, sentence_len, word_len, char_embedding_dim = char_embedding_out.shape
-            char_cnn_max_out = torch.zeros(batch_size, sentence_len, self.char_cnn.out_channels)
+            char_cnn_max_out = torch.zeros(batch_size, sentence_len, self.char_cnn.out_channels, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
             # iterate over sentences
             for sentence_i in range(sentence_len):
                 # character field of sentence i
