@@ -18,10 +18,9 @@ from model_trainer import NERTrainer
 # n, m = int(n), int(m)
 m = 80
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-seed = 256
-torch.manual_seed(seed)
+
+seeds = [2**x for x in np.arange(8)]
 torch.backends.cudnn.deterministic = True
 
 new_calculation = True
@@ -63,13 +62,11 @@ trf_dropout_ratio = 0.1
 max_grad_norm = 1.0
 n_epoch = 64
 
-# training, validation, testing spli
-# split = (0.1, 0.1, 0.8)
+# training proportion
+splits = np.arange(10, 85, 5)
 
 data_names = ['solid_state', 'aunpmorph', 'doping']
 # data_names = ['solid_state']
-seeds = np.arange(100, 115)
-# seeds = [seed]
 
 for data_name in data_names:
     for seed in seeds:
@@ -79,24 +76,24 @@ for data_name in data_names:
         # configs['_crf_iobes_{}'.format(seed)] = {'sentence_level': True,
         #                                          'format': 'IOBES',
         #                                          'use_crf': True,
-        #                                          'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+        #                                          'lr': 5e-2,
         #                                          'split': split}
         # configs['_crf_iob2_{}'.format(seed)] = {'sentence_level': True,
         #                                         'format': 'IOB2',
         #                                         'use_crf': True,
-        #                                         'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+        #                                         'lr': 5e-2,
         #                                         'split': split}
         # configs['_logit_iobes_{}'.format(seed)] = {'sentence_level': True,
         #                                            'format': 'IOBES',
         #                                            'use_crf': False,
-        #                                            'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+        #                                            'lr': 5e-2,
         #                                            'split': split}
         # configs['_logit_iob2_{}'.format(seed)] = {'sentence_level': True,
         #                                           'format': 'IOB2',
         #                                           'use_crf': False,
-        #                                           'lr': {'bilstm': 5e-2, 'transformer': 5e-2},
+        #                                           'lr': 5e-2,
         #                                           'split': split}
-        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': {'bilstm': 5e-2, 'transformer': 5e-2}, 'split': (0.1, split/800, split/100)} for split in np.arange(10, 85, 5)}
+        configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': 5e-2, 'split': (0.1, split/800, split/100)} for split in splits}
                 
         for alias, config in configs.items():
             data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
@@ -148,38 +145,15 @@ for data_name in data_names:
             print(bilstm)
             print(m*'-')
 
-            # # initialize transformer
-            # transformer = Transformer_NER(input_dim=text_vocab_size, embedding_dim=embedding_dim,
-            #                             char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,
-            #                             char_filter=char_filter, char_kernel=char_kernel,
-            #                             hidden_dim=hidden_dim, output_dim=tag_vocab_size,
-            #                             trf_layers=trf_layers, attn_heads=attn_heads, use_crf=config['use_crf'],
-            #                             embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio,
-            #                             trf_dropout_ratio=trf_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
-            #                             tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
-            #                             char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-            #                             pretrained_embeddings=pretrained_embeddings, tag_format=config['format'])
-            # # print transformer information
-            # print('Transformer model initialized with {} trainable parameters'.format(transformer.count_parameters()))
-            # print(transformer)
-            # print(m*'-')
 
             # initialize trainer class for bilstm
             bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
                                         lr=config['lr']['bilstm'], max_grad_norm=max_grad_norm, device=device)
-            # initialize trainer class for transformer
-            # transformer_trainer = NERTrainer(model=transformer, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-            #                                  lr=config['lr']['transformer'], max_grad_norm=max_grad_norm, device=device)
 
             # bilstm paths
             bilstm_history_path = Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)
             bilstm_test_path = Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)
             bilstm_model_path = Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)
-
-            # transformer paths
-            # transformer_history_path = Path(__file__).parent / '../model/transformer/history/{}_history.pt'.format(data_name+alias)
-            # transformer_test_path = Path(__file__).parent / '../model/transformer/test/{}_test.pt'.format(data_name+alias)
-            # transformer_model_path = Path(__file__).parent / '../model/transformer/{}_model.pt'.format(data_name+alias)
 
             # if new_calculation, then train and save the model. otherwise, just load everything from file
             if new_calculation:
@@ -192,30 +166,14 @@ for data_name in data_names:
                         bilstm_trainer.load_history(history_path=bilstm_history_path)
                 bilstm_trainer.train(n_epoch=n_epoch)
                 bilstm_trainer.load_state_from_cache('best_validation_f1')
-                bilstm_trainer.save_model(model_path=bilstm_model_path)
-                bilstm_trainer.save_history(history_path=bilstm_history_path)
+                # bilstm_trainer.save_model(model_path=bilstm_model_path)
+                # bilstm_trainer.save_history(history_path=bilstm_history_path)
                 print(m*'-')
-                # print('training Transformer model')
-                # print(m*'-')
-                # if use_history:
-                #     if os.path.isfile(transformer_model_path):
-                #         print('loading model checkpoint')
-                #         transformer_trainer.load_model(model_path=transformer_model_path)
-                #         transformer_trainer.load_history(history_path=transformer_history_path)
-                # transformer_trainer.train(n_epoch=n_epoch)
-                # transformer_trainer.load_state_from_cache('best_validation_f1')
-                # transformer_trainer.save_model(model_path=transformer_model_path)
-                # transformer_trainer.save_history(history_path=transformer_history_path)
-                # print(m*'-')
             else:
                 print('loading BiLSTM model')
                 print(m*'-')
                 bilstm_trainer.load_model(model_path=bilstm_model_path)
                 bilstm_trainer.load_history(history_path=bilstm_history_path)
-                # print('loading Transformer model')
-                # print(m*'-')
-                # transformer_trainer.load_model(model_path=transformer_model_path)
-                # transformer_trainer.load_history(history_path=transformer_history_path)
                 print(m*'-')
 
             # evaluate test set
@@ -224,6 +182,3 @@ for data_name in data_names:
             print(classification_report(valid_tags, prediction_tags, mode=bilstm_trainer.metric_mode,
                                         scheme=bilstm_trainer.metric_scheme))
             print(m*'-')
-            # print('testing Transformer')
-            # transformer_trainer.test(transformer_test_path)
-            # print(m*'-')
