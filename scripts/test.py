@@ -14,8 +14,10 @@ from model_crf import CRF
 from model_ner import BiLSTM_NER, Transformer_NER
 from model_trainer import NERTrainer
 
-n, m = subprocess.check_output(['stty', 'size']).decode().split()
-n, m = int(n), int(m)
+# n, m = subprocess.check_output(['stty', 'size']).decode().split()
+# n, m = int(n), int(m)
+m = 80
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 256
