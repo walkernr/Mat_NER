@@ -50,7 +50,10 @@ class DataCorpus(object):
                                                                                       train=self.data_name+self.alias+'_train.tsv',
                                                                                       validation=self.data_name+self.alias+'_valid.tsv',
                                                                                       test=self.data_name+self.alias+'_test.tsv')
-        self.classes = np.unique(np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), dtype=str) for split in ('train', 'valid', 'test')], axis=0)[:, 1])
+        full_tags = np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), dtype=str)[:, 1] for split in ('train', 'valid', 'test')])
+        prefixes = np.unique([tag.split('_')[0] for tag in full_tags)])
+        tags = np.unique([tag.split('_')[1] for tag in full_tags)])
+        self.classes = [['{}-{}'.format(prefix, tag) for prefix in prefixes] for tag in tags]
 
 
     def build_tag_vocabulary(self):
