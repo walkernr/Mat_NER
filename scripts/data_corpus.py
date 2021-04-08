@@ -51,8 +51,8 @@ class DataCorpus(object):
                                                                                       validation=self.data_name+self.alias+'_valid.tsv',
                                                                                       test=self.data_name+self.alias+'_test.tsv')
         full_tags = np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), dtype=str)[:, 1] for split in ('train', 'valid', 'test')])
-        prefixes = np.unique([tag.split('_')[0] for tag in full_tags)])
-        tags = np.unique([tag.split('_')[1] for tag in full_tags)])
+        prefixes = np.unique([tag.split('_')[0] for tag in full_tags])
+        tags = np.unique([tag.split('_')[1] for tag in full_tags])
         self.classes = [['{}-{}'.format(prefix, tag) for prefix in prefixes] for tag in tags]
 
 
