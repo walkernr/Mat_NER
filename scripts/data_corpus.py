@@ -49,10 +49,11 @@ class DataCorpus(object):
                                                                                       train=self.data_name+self.alias+'_train.tsv',
                                                                                       validation=self.data_name+self.alias+'_valid.tsv',
                                                                                       test=self.data_name+self.alias+'_test.tsv')
+        self.classes = np.unique(np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), dtype=str) for split in ('train', 'valid', 'test')], axis=0)[:, 1])
 
 
     def build_tag_vocabulary(self):
-        self.tag_field.build_vocab([t for t in self.train_set.tag]+[t for t in self.valid_set.tag]+[t for t in self.test_set.tag])
+        self.tag_field.build_vocab(self.classes)
         self.tag_pad_idx = self.tag_field.vocab.stoi[self.pad_token]
         self.tag_names = self.tag_field.vocab.itos
 
