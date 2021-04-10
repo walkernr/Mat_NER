@@ -108,7 +108,7 @@ class CRF(nn.Module):
 
     def forward(self, fc_out, tags):
         # mask ignores pad index
-        mask = torch.where(tags == self.tag_pad_idx, torch.uint8(0),  torch.uint8(1))
+        mask = torch.where(tags == self.tag_pad_idx, torch.zeros(*tags.shape, dtype=torch.bool),  torch.ones(*tags.shape, dtype=torch.bool))
         # compute output and loss
         crf_out = self.crf.decode(fc_out, mask=mask)
         crf_loss = -self.crf(fc_out, tags=tags, mask=mask, reduction='mean')
