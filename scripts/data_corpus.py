@@ -50,7 +50,7 @@ class DataCorpus(object):
                                                                                       train=self.data_name+self.alias+'_train.tsv',
                                                                                       validation=self.data_name+self.alias+'_valid.tsv',
                                                                                       test=self.data_name+self.alias+'_test.tsv')
-        full_tags = np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), dtype=str)[:, 1] for split in ('train', 'valid', 'test')])
+        full_tags = np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), delimiter='\t', dtype=str)[:, 1] for split in ('train', 'valid', 'test')])
         tags = np.unique([tag.split('-')[1] for tag in full_tags if '-' in tag])
         if self.tag_format in ('IOB1', 'IOB2'):
             prefixes = ['I', 'B']
