@@ -90,4 +90,4 @@ class DataCorpus(object):
 
     def initialize_iterators(self):
         self.train_iter, self.valid_iter, self.test_iter = BucketIterator.splits(datasets=(self.train_set, self.valid_set, self.test_set),
-                                                                                 batch_size=self.batch_size, shuffle=True, sort=False, device=self.device)
+                                                                                 batch_size=self.batch_size, shuffle=False, sort=False, device=self.device)
