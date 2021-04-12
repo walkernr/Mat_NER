@@ -109,7 +109,7 @@ class CRF(nn.Module):
     def forward(self, fc_out, tags):
         # mask ignores pad index
         if tags.size()[:2] != fc_out.size()[:2]:
-            tags = torch.cat((tags, torch.zeros(tags.size()[0], 1, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))), axis=1)
+            tags = torch.cat((tags, torch.zeros(tags.size()[0], 1, dtype=torch.long, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))), axis=1)
         mask = (tags != self.tag_pad_idx)
         # compute output and loss
         crf_out = self.crf.decode(fc_out, mask=mask)
