@@ -20,7 +20,7 @@ m = 80
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-seeds = [2**x for x in np.arange(8)]
+seeds = [2**x for x in np.arange(3, 8)]
 torch.backends.cudnn.deterministic = True
 
 new_calculation = True
