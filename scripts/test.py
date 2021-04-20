@@ -65,7 +65,7 @@ n_epoch = 64
 # training proportion
 splits = np.arange(10, 85, 5)
 
-data_names = ['doping']
+data_names = ['aunpmorph', 'solid_state']
 # data_names = ['solid_state']
 
 for data_name in data_names:
