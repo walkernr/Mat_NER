@@ -7,7 +7,7 @@ from torch import nn
 from torch.optim import Adam
 from torchtools.optim import RangerLars
 from seqeval.metrics import classification_report
-from data_utilities import data_format, data_tag, data_split, data_save
+from data_utilities import collect_abstracts, split_abstracts, format_abstracts, tag_abstracts, save_tagged_splits
 from data_tokenizer import MaterialsTextTokenizer
 from data_corpus import DataCorpus
 from model_crf import CRF
@@ -20,7 +20,7 @@ m = 80
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-seeds = [2**x for x in np.arange(8, 16)]
+seeds = [2**x for x in np.arange(16)]
 torch.backends.cudnn.deterministic = True
 
 new_calculation = True
@@ -65,8 +65,7 @@ n_epoch = 64
 # training proportion
 splits = np.arange(10, 85, 5)
 
-data_names = ['aunpmorph', 'solid_state']
-# data_names = ['solid_state']
+data_names = ['aunpmorph', 'doping', 'solid_state']
 
 for data_name in data_names:
     for seed in seeds:
@@ -96,8 +95,8 @@ for data_name in data_names:
         configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': 5e-2, 'split': (0.1, split/800, split/100)} for split in splits}
                 
         for alias, config in configs.items():
-            data = data_tag(data_format(data_path, data_name, config['sentence_level']), tag_format=config['format'])
-            data_save(data_path, data_name, '_{}'.format(seed), *data_split(data, config['split'], seed))
+            data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, data_name), config['split'], seed), seed, config['sentence_level']), config['format'])
+            save_tagged_splits(data_path, data_name, '_{}'.format(seed), data)
             corpus = DataCorpus(data_path=data_path, data_name=data_name, alias='_{}'.format(seed), vector_path=vector_path,
                                 tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
 
@@ -119,7 +118,7 @@ for data_name in data_names:
 
             print('train set: {} sentences'.format(len(corpus.train_set)))
             print('valid set: {} sentences'.format(len(corpus.valid_set)))
-            print('test set: {} sentences'.format(len(corpus.valid_set)))
+            print('test set: {} sentences'.format(len(corpus.test_set)))
             print(m*'-')
 
             text_pad_idx = corpus.text_pad_idx
