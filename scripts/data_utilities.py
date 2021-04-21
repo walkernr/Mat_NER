@@ -4,15 +4,19 @@ import numpy as np
 
 
 def collect_abstracts(data_path, data_name):
-    dois = []
+    identifiers = []
     data = []
     with open(data_path+'/original/'+data_name+'.json', 'r') as f:
         for line in f:
             d = json.loads(line)
-            if d['doi'] in dois:
+            if data_name == 'solid_state':
+                identifier = d['doi']
+            elif data_name in ['doping', 'aunpmorph']:
+                identifier = d['text']
+            if identifier in identifiers:
                 pass
             else:
-                dois.append(d['doi'])
+                identifiers.append(identifier)
                 data.append(d)
     return data
 
