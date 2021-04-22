@@ -65,7 +65,7 @@ n_epoch = 64
 # training proportion
 splits = np.arange(10, 85, 5)
 
-data_names = ['aunpmorph', 'doping', 'solid_state']
+data_names = ['doping', 'solid_state']
 
 for data_name in data_names:
     for seed in seeds:
@@ -96,6 +96,13 @@ for data_name in data_names:
                 
         for alias, config in configs.items():
             data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, data_name), config['split'], seed), seed, config['sentence_level']), config['format'])
+            # idents = 0
+            # for a in data['test']:
+            #     for b in data['valid']:
+            #         if ' '.join(a['text']) == ' '.join(b['text']):
+            #             idents += 1
+            #             print(' '.join(a['text']))
+            # print(idents)
             save_tagged_splits(data_path, data_name, '_{}'.format(seed), data)
             corpus = DataCorpus(data_path=data_path, data_name=data_name, alias='_{}'.format(seed), vector_path=vector_path,
                                 tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
