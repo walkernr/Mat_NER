@@ -190,6 +190,6 @@ for data_name in data_names:
                                                 scheme=bilstm_trainer.metric_scheme))
                     print(m*'-')
                 else:
-                    print('already calculated {}, skipping'.format(data_name+alias))`
+                    print('already calculated {}, skipping'.format(data_name+alias))
             except:
                 print('error calculating {}'.format(data_name+alias))
