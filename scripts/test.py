@@ -100,7 +100,7 @@ for data_name in data_names:
                 bilstm_history_path = (Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)).resolve().as_posix()
                 bilstm_test_path = (Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)).resolve().as_posix()
                 bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)).resolve().as_posix()
-                if not os.path.exists(bilstm_test_path) and not new_calculation:
+                if os.path.exists(bilstm_test_path) and not new_calculation:
                     print('already calculated {}, skipping'.format(data_name+alias))
                 else:
                     data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, data_name), config['split'], seed), seed, config['sentence_level']), config['format'])
