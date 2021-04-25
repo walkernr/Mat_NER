@@ -96,7 +96,7 @@ for data_name in data_names:
                 
         for alias, config in configs.items():
             try:
-            `    # bilstm paths
+                # bilstm paths
                 bilstm_history_path = (Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)).resolve().as_posix()
                 bilstm_test_path = (Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)).resolve().as_posix()
                 bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)).resolve().as_posix()
