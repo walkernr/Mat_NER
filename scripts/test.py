@@ -97,9 +97,9 @@ for data_name in data_names:
         for alias, config in configs.items():
             try:
                 # bilstm paths
-                bilstm_history_path = Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)
-                bilstm_test_path = Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)
-                bilstm_model_path = Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)
+                bilstm_history_path = (Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)).resolve().as_posix()
+                bilstm_test_path = (Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(data_name+alias)).resolve().as_posix()
+                bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(data_name+alias)).resolve().as_posix()
                 if os.path.exists(bilst_test_path) and new_calculation:
                     data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, data_name), config['split'], seed), seed, config['sentence_level']), config['format'])
                     # idents = 0
@@ -190,6 +190,6 @@ for data_name in data_names:
                                                 scheme=bilstm_trainer.metric_scheme))
                     print(m*'-')
                 else:
-                    print('already calculated {}, skipping'.format(alias))
+                    print('already calculated {}, skipping'.format(data_name+alias))
             except:
-                print('error calculating {}'.format(alias))
+                print('error calculating {}'.format(data_name+alias))
