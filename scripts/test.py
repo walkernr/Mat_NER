@@ -95,6 +95,7 @@ for data_name in data_names:
         configs = {'_crf_iobes_{}_{}'.format(seed, split): {'sentence_level': True, 'format': 'IOBES', 'use_crf': True, 'lr': 5e-2, 'split': (0.1, split/800, split/100)} for split in splits}
                 
         for alias, config in configs.items():
+            print(data_name+alias)
             try:
                 # bilstm paths
                 bilstm_history_path = (Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(data_name+alias)).resolve().as_posix()
