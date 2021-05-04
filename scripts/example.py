@@ -160,5 +160,5 @@ if __name__ == '__main__':
                     print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
                                                 scheme=bilstm_trainer.metric_scheme))
                     print(m*'-')
-                    except:
-                        print('error calculating {}'.format(alias))
+                    # except:
+                    #     print('error calculating {}'.format(alias))
