@@ -49,11 +49,11 @@ class NERTrainer(object):
         # initialize empty lists for training
         self.epoch_metrics = {'training': {}, 'validation': {}}
         self.metric_mode = 'strict'
-        if self.data.tag_format == 'IOB1':
+        if self.data.tag_scheme == 'IOB1':
             self.metric_scheme = IOB1
-        elif self.data.tag_format == 'IOB2':
+        elif self.data.tag_scheme == 'IOB2':
             self.metric_scheme = IOB2
-        elif self.data.tag_format == 'IOBES':
+        elif self.data.tag_scheme == 'IOBES':
             self.metric_scheme = IOBES
         self.past_epoch = 0
     
@@ -114,8 +114,10 @@ class NERTrainer(object):
         # initialize lists for batch losses and metrics
         metrics = {'loss': [], 'accuracy_score': [], 'precision_score': [], 'recall_score': [], 'f1_score': []}
         if mode == 'test':
-            prediction_tags_all = []
-            valid_tags_all = []
+            text_all = []
+            char_all = []
+            valid_all = []
+            prediction_all = []
         # initialize batch range
         batch_range = tqdm(iterator, desc='')
         for batch in batch_range:
@@ -145,8 +147,10 @@ class NERTrainer(object):
             valid_tags = [[self.data.tag_field.vocab.itos[ii] for ii in i if self.data.tag_field.vocab.itos[ii] != self.data.pad_token] for i in true]
 
             if mode == 'test':
-                prediction_tags_all.extend(prediction_tags)
-                valid_tags_all.extend(valid_tags)
+                text_all.extend(list(text.cpu().numpy()))
+                char_all.extend(list(char.cpu().numpy()))
+                valid_all.extend(label_tags)
+                prediction_all.extend(prediction_tags)
 
             # calculate the accuracy and f1 scores
             accuracy = accuracy_score(valid_tags, prediction_tags)
@@ -173,7 +177,7 @@ class NERTrainer(object):
             batch_range.set_description('| epoch: {:d}/{:d} | {} | loss: {:.4f} | accuracy: {:.4f} | precision: {:.4f} | recall: {:.4f} | f1: {:.4f} |'.format(self.past_epoch+epoch+1, self.past_epoch+n_epoch, mode, *means))
         # return the batch losses and metrics
         if mode == 'test':
-            return metrics, prediction_tags_all, valid_tags_all
+            return metrics, text_all, char_all, valid_all, prediction_all
         else:
             return metrics
     
@@ -207,10 +211,10 @@ class NERTrainer(object):
             # turn off gradients for evaluating
             with torch.no_grad():
                 # evaluate all of the batches and collect the batch/epoch loss/metrics
-                metrics, prediction_tags, valid_tags = self.iterate_batches(epoch, n_epoch, iterator, mode)
+                metrics, text, char, valid, prediction = self.iterate_batches(epoch, n_epoch, iterator, mode)
         # return batch/epoch loss/metrics
         if mode == 'test':
-            return metrics, prediction_tags, valid_tags
+            return metrics, text, char, valid, prediction
         else:
             return metrics
     
@@ -240,6 +244,6 @@ class NERTrainer(object):
     
     def test(self, test_path):
         ''' evaluates the test set '''
-        metrics, prediction_tags, valid_tags = self.train_evaluate_epoch(0, 1, self.data.test_iter, 'test')
-        torch.save((metrics, prediction_tags, valid_tags), test_path)
-        return metrics, prediction_tags, valid_tags
+        metrics, text, char, valid, prediction = self.train_evaluate_epoch(0, 1, self.data.test_iter, 'test')
+        torch.save((metrics, text, char, valid, prediction), test_path)
+        return metrics, text, char, valid, prediction

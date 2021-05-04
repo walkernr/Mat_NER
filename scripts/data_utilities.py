@@ -44,20 +44,22 @@ def format_abstracts(data_split, seed, sentence_level=True):
     return data_fmt
 
 
-def tag_abstracts(data_fmt, tag_format):
+def tag_abstracts(data_fmt, tag_scheme):
     for split in data_fmt.keys():
         for dat in data_fmt[split]:
             annotation = dat['annotation']
             dat['tag'] = []
             for i in range(len(annotation)):
-                if tag_format == 'IOB1':
+                if tag_scheme == 'IOB1':
                     if annotation[i] in [None, 'PVL', 'PUT']:
                         dat['tag'].append('O')
-                    elif i == 0:
+                    elif i == 0 and len(annotation) > 1:
                         if annotation[i+1] == annotation[i]:
                             dat['tag'].append('B-'+annotation[i])
                         else:
                             dat['tag'].append('I-'+annotation[i])
+                    elif i == 0 and len(annotation) == 1:
+                        dat['tag'].append('I'-annotation[i])
                     elif i > 0:
                         if annotation[i-1] == annotation[i]:
                             dat['tag'].append('I-'+annotation[i])
@@ -66,7 +68,7 @@ def tag_abstracts(data_fmt, tag_format):
                                 dat['tag'].append('B-'+annotation[i])
                             else:
                                 dat['tag'].append('I-'+annotation[i])
-                elif tag_format == 'IOB2':
+                elif tag_scheme == 'IOB2':
                     if annotation[i] in [None, 'PVL', 'PUT']:
                         dat['tag'].append('O')
                     elif i == 0:
@@ -76,14 +78,16 @@ def tag_abstracts(data_fmt, tag_format):
                             dat['tag'].append('I-'+annotation[i])
                         else:
                             dat['tag'].append('B-'+annotation[i])
-                elif tag_format == 'IOBES':
+                elif tag_scheme == 'IOBES':
                     if annotation[i] in [None, 'PVL', 'PUT']:
                         dat['tag'].append('O')
-                    elif i == 0:
+                    elif i == 0 and len(annotation) > 1:
                         if annotation[i+1] == annotation[i]:
                             dat['tag'].append('B-'+annotation[i])
                         else:
                             dat['tag'].append('S-'+annotation[i])
+                    elif i == 0 and len(annotation) == 1:
+                        dat['tag'].append('S-'+annotation[i])
                     elif i > 0 and i < len(annotation)-1:
                         if annotation[i-1] != annotation[i] and annotation[i+1] == annotation[i]:
                             dat['tag'].append('B-'+annotation[i])

@@ -114,7 +114,7 @@ for data_name in data_names:
                     # print(idents)
                     save_tagged_splits(data_path, data_name, '_{}'.format(seed), data)
                     corpus = DataCorpus(data_path=data_path, data_name=data_name, alias='_{}'.format(seed), vector_path=vector_path,
-                                        tokenizer=tokenizer, cased=cased, tag_format=config['format'], batch_size=batch_size, device=device)
+                                        tokenizer=tokenizer, cased=cased, tag_scheme=config['format'], batch_size=batch_size, device=device)
 
                     embedding_dim = corpus.embedding_dim
                     text_vocab_size = len(corpus.text_field.vocab)
@@ -154,7 +154,7 @@ for data_name in data_names:
                                         attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                                         tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                                         char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                                        pretrained_embeddings=pretrained_embeddings, tag_format=config['format'])
+                                        pretrained_embeddings=pretrained_embeddings, tag_scheme=config['format'])
                     # print bilstm information
                     print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
                     print(bilstm)
@@ -188,8 +188,8 @@ for data_name in data_names:
 
                     # evaluate test set
                     print('testing BiLSTM')
-                    _, prediction_tags, valid_tags = bilstm_trainer.test(bilstm_test_path)
-                    print(classification_report(valid_tags, prediction_tags, mode=bilstm_trainer.metric_mode,
+                    _, _, _, _, labels, predictions = bilstm_trainer.test(bilstm_test_path)
+                    print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
                                                 scheme=bilstm_trainer.metric_scheme))
                     print(m*'-')
             except:

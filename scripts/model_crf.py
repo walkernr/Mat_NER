@@ -3,13 +3,13 @@ from torch import nn
 import torchcrf
 
 class CRF(nn.Module):
-    def __init__(self, tag_pad_idx, pad_token, tag_names, tag_format):
+    def __init__(self, tag_pad_idx, pad_token, tag_names, tag_scheme):
         super().__init__()
         # tag pad index and tag names
         self.tag_pad_idx = tag_pad_idx
         self.pad_token = pad_token
         self.tag_names = tag_names
-        self.tag_format = tag_format
+        self.tag_scheme = tag_scheme
         self.prefixes = set([tag_name[0] for tag_name in self.tag_names if tag_name != self.pad_token])
         # initialize CRF
         self.crf = torchcrf.CRF(num_tags=len(self.tag_names), batch_first=True)
@@ -17,7 +17,7 @@ class CRF(nn.Module):
 
     def define_invalid_crf_transitions(self):
         ''' function for establishing valid tagging transitions, assumes IOB1, IOB2, or IOBES tagging '''
-        if self.tag_format == 'IOB1':
+        if self.tag_scheme == 'IOB1':
             # (B)eginning (I)nside (O)utside
             # all beginnings are valid
             self.invalid_begin = ()
@@ -27,7 +27,7 @@ class CRF(nn.Module):
             self.invalid_transitions_position = {'B': 'BO'}
             # prevent B (beginning) going to I (inside) or B (beginning) of a different type
             self.invalid_transitions_tags = {'B': 'IB'}
-        elif self.tag_format == 'IOB2':
+        elif self.tag_scheme == 'IOB2':
             # (B)eginning (I)nside (O)utside
             # cannot begin sentence with I (inside), only B (beginning) or O (outside)
             self.invalid_begin = ('I',)
@@ -39,7 +39,7 @@ class CRF(nn.Module):
             # prevent I (inside) going to I (inside) of a different type
             self.invalid_transitions_tags = {'B': 'I',
                                              'I': 'I'}
-        elif self.tag_format == 'IOBES':
+        elif self.tag_scheme == 'IOBES':
             # (I)nside (O)utside (B)eginning (E)nd (S)ingle 
             # cannot begin sentence with I (inside) or E (end)
             if 'I' in self.prefixes:

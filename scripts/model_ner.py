@@ -31,7 +31,7 @@ class NERModel(nn.Module):
                  embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_format):
+                 pretrained_embeddings, tag_scheme):
         '''
         basic class for named entity recognition models. inherits from neural network module.
         layers and forward function will be defined by a child class.
@@ -56,7 +56,7 @@ class NERModel(nn.Module):
         tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_format: tagging format
+        tag_scheme: tagging format
         '''
         # initialize the superclass
         super().__init__()
@@ -77,7 +77,7 @@ class NERModel(nn.Module):
         # pretrained word embeddings
         self.pretrained_embeddings = pretrained_embeddings
         # tag format
-        self.tag_format = tag_format
+        self.tag_scheme = tag_scheme
     
 
     def init_weights(self):
@@ -117,7 +117,7 @@ class BiLSTM_NER(NERModel):
                  attn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_format):
+                 pretrained_embeddings, tag_scheme):
         '''
         BiLSTM model for named entity recognition. inherits from named recognition model
 
@@ -144,7 +144,7 @@ class BiLSTM_NER(NERModel):
         tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_format: tagging format
+        tag_scheme: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
@@ -154,7 +154,7 @@ class BiLSTM_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, tag_format)
+                         pretrained_embeddings, tag_scheme)
         # network structure settings
         self.lstm_layers = lstm_layers
         # dropout ratios
@@ -202,7 +202,7 @@ class BiLSTM_NER(NERModel):
         self.fc = nn.Linear(self.hidden_dim*2, self.output_dim)
         # use crf layer if it is switched on
         if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_format)            
+            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_scheme)            
     
 
     def forward(self, sentence, characters, tags):
@@ -257,7 +257,7 @@ class Transformer_NER(NERModel):
                  fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_format):
+                 pretrained_embeddings, tag_scheme):
         '''
         Transformer model for named entity recognition. inherits from neural network module
 
@@ -282,7 +282,7 @@ class Transformer_NER(NERModel):
         char_pad_idx: indices for character unknown tokens
         tag_pad_idx: index for tag padding token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_format: tagging format
+        tag_scheme: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
@@ -292,7 +292,7 @@ class Transformer_NER(NERModel):
                          embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                          tag_names, text_pad_idx, text_unk_idx,
                          char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, tag_format)
+                         pretrained_embeddings, tag_scheme)
         # network structure settings
         self.trf_layers = trf_layers
         # dropout ratios
@@ -344,7 +344,7 @@ class Transformer_NER(NERModel):
         self.fc2 = nn.Linear(self.hidden_dim, self.output_dim)
         # use crf layer if it is switched on
         if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_format)
+            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_scheme)
     
 
     def forward(self, sentence, characters, tags):

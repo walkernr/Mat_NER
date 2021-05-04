@@ -8,14 +8,14 @@ from torchtext.vocab import Vocab
 
 
 class DataCorpus(object):
-    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, tag_format, batch_size, device):
+    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, tag_scheme, batch_size, device):
         self.data_path = data_path
         self.data_name = data_name
         self.alias = alias
         self.vector_path = vector_path
         self.tokenizer = tokenizer
         self.cased = cased
-        self.tag_format = tag_format
+        self.tag_scheme = tag_scheme
         self.batch_size = batch_size
         self.device = device
         self.pad_token = self.tokenizer.pad_token
@@ -52,9 +52,9 @@ class DataCorpus(object):
                                                                                       test=self.data_name+self.alias+'_test.tsv')
         full_tags = np.concatenate([np.loadtxt(self.data_path+'/split/'+self.data_name+self.alias+'_{}.tsv'.format(split), delimiter='\t', dtype=str)[:, 1] for split in ('train', 'valid', 'test')])
         tags = np.unique([tag.split('-')[1] for tag in full_tags if '-' in tag])
-        if self.tag_format in ('IOB1', 'IOB2'):
+        if self.tag_scheme in ('IOB1', 'IOB2'):
             prefixes = ['I', 'B']
-        elif self.tag_format == 'IOBES':
+        elif self.tag_scheme == 'IOBES':
             prefixes = ['I', 'B', 'E', 'S']
         self.classes = [['{}-{}'.format(prefix, tag) for prefix in prefixes] for tag in tags]
         self.classes.insert(0, ['O'])
