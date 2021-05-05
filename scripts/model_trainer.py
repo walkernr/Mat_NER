@@ -149,7 +149,7 @@ class NERTrainer(object):
             if mode == 'test':
                 text_all.extend(list(text.cpu().numpy()))
                 char_all.extend(list(char.cpu().numpy()))
-                valid_all.extend(label_tags)
+                valid_all.extend(valid_tags)
                 prediction_all.extend(prediction_tags)
 
             # calculate the accuracy and f1 scores

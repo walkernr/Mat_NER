@@ -1,8 +1,11 @@
 import os
 import argparse
+from pathlib import Path
 import numpy as np
 from seqeval.scheme import IOB1, IOB2, IOBES
 from seqeval.metrics import classification_report
+from data_utilities import collect_abstracts, split_abstracts, format_abstracts, tag_abstracts, save_tagged_splits
+from data_tokenizer import MaterialsTextTokenizer
 
 
 def parse_args():
@@ -14,8 +17,8 @@ def parse_args():
     parser.add_argument('-ds', '--datasets', help='comma-separated datasets to be considered (e.g. solid_state,doping)', type=str, default='solid_state')
     parser.add_argument('-sl', '--sentence_level', help='switch for sentence-level learning instead of paragraph-level', action='store_true')
     parser.add_argument('-bs', '--batch_size', help='number of samples in each batch', type=int, default=32)
-    parser.add_argument('-ne', '--n_epochs', help='number of training epochs', type=int, default=16)
-    parser.add_argument('-lr', '--learning_rate', help='optimizer learning rate', type=float, default=2e-4)
+    parser.add_argument('-ne', '--n_epochs', help='number of training epochs', type=int, default=64)
+    parser.add_argument('-lr', '--learning_rate', help='optimizer learning rate', type=float, default=5e-2)
     parser.add_argument('-km', '--keep_model', help='switch for saving the best model parameters to disk', action='store_true')
     args = parser.parse_args()
     return args.device, args.seeds, args.tag_schemes, args.splits, args.datasets, args.sentence_level, args.batch_size, args.n_epochs, args.learning_rate, args.keep_model
@@ -23,6 +26,7 @@ def parse_args():
 
 if __name__ == '__main__':
     device, seeds, tag_schemes, splits, datasets, sentence_level, batch_size, n_epochs, lr, keep_model = parse_args()
+    m = 80
     if 'gpu' in device:
         gpu = True
         try:
@@ -34,6 +38,7 @@ if __name__ == '__main__':
         gpu = False
     if gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(n)
+    from data_corpus import DataCorpus
     import torch
     from torch import nn
     from torch.optim import Adam
@@ -49,7 +54,6 @@ if __name__ == '__main__':
     tag_schemes = [str(tag_scheme) for tag_scheme in tag_schemes.split(',')]
     splits = [int(split) for split in splits.split(',')]
     datasets = [str(dataset) for dataset in datasets.split(',')]
-    models = [str(model) for model in models.split(',')]
 
     phraser_path = (Path(__file__).parent / '../model/phraser/phraser.pkl').resolve().as_posix()
     vector_path = (Path(__file__).parent / '../model/mat2vec/pretrained_embeddings').resolve().as_posix()
@@ -92,10 +96,10 @@ if __name__ == '__main__':
                     bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(alias)).resolve().as_posix()
 
                     # try:
-                    data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), split, seed), seed, sentence_level), tag_scheme)
-                    save_tagged_splits(data_path, data_name, '_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), data)
+                    data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), (0.1, split/800, split/100), seed), seed, sentence_level), tag_scheme)
+                    save_tagged_splits(data_path, dataset, '_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), data)
                     corpus = DataCorpus(data_path=data_path, data_name=dataset, alias='_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), vector_path=vector_path,
-                                        tokenizer=tokenizer, cased=cased, tag_format=tag_scheme, batch_size=batch_size, device=device)
+                                        tokenizer=tokenizer, cased=cased, tag_scheme=tag_scheme, batch_size=batch_size, device=device)
                     
                     embedding_dim = corpus.embedding_dim
                     text_vocab_size = len(corpus.text_field.vocab)
@@ -113,9 +117,9 @@ if __name__ == '__main__':
                     print('tags: '+(tag_vocab_size*'{} ').format(*tag_names))
                     print(m*'-')
 
-                    print('train set: {} sentences'.format(len(corpus.train_set)))
-                    print('valid set: {} sentences'.format(len(corpus.valid_set)))
-                    print('test set: {} sentences'.format(len(corpus.test_set)))
+                    print('train set: {} {}s'.format(len(corpus.train_set), 'sentence' if sentence_level else 'paragraph'))
+                    print('valid set: {} {}s'.format(len(corpus.valid_set), 'sentence' if sentence_level else 'paragraph'))
+                    print('test set: {} {}s'.format(len(corpus.test_set), 'sentence' if sentence_level else 'paragraph'))
                     print(m*'-')
 
                     text_pad_idx = corpus.text_pad_idx
@@ -135,7 +139,7 @@ if __name__ == '__main__':
                                         attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
                                         tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
                                         char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                                        pretrained_embeddings=pretrained_embeddings, tag_format=tag_scheme)
+                                        pretrained_embeddings=pretrained_embeddings, tag_scheme=tag_scheme)
                     # print bilstm information
                     print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
                     print(bilstm)
@@ -156,7 +160,7 @@ if __name__ == '__main__':
                     print(m*'-')
 
                     print('testing BiLSTM')
-                    _, _, _, _, labels, predictions = bilstm_trainer.test(bilstm_test_path)
+                    _, _, _, labels, predictions = bilstm_trainer.test(bilstm_test_path)
                     print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
                                                 scheme=bilstm_trainer.metric_scheme))
                     print(m*'-')

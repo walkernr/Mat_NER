@@ -11,10 +11,10 @@ def collect_abstracts(data_path, data_name):
             d = json.loads(line)
             if 'solid_state' in data_name:
                     identifier = d['doi']
-                elif 'aunp' in data_name:
-                    identifier = d['meta']['doi']
-                elif 'doping' in data_name:
-                    identifier = d['text']
+            elif 'aunp' in data_name:
+                identifier = d['meta']['doi']
+            elif 'doping' in data_name:
+                identifier = d['text']
             if identifier in identifiers:
                 pass
             else:
