@@ -64,9 +64,9 @@ if __name__ == '__main__':
     # corpus parameters
     cased = True
     # cnn parameters
-    char_embedding_dim = 38
+    char_embedding_dim = 64
     char_filter = 4
-    char_kernel = 3
+    char_kernel = 2
     # dropouts
     embedding_dropout_ratio = 0.5
     char_embedding_dropout_ratio = 0.25
