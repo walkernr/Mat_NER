@@ -96,6 +96,10 @@ if __name__ == '__main__':
                     bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(alias)).resolve().as_posix()
                     if os.path.exists(bilstm_test_path):
                         print('already calculated {}, skipping'.format(alias))
+                        _, _, _, labels, predictions = torch.load(bilstm_test_path)
+                        print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
+                                                        scheme=bilstm_trainer.metric_scheme))
+                        print(m*'-')
                     else:
                         try:
                             data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), (0.1, split/800, split/100), seed), seed, sentence_level), tag_scheme)
