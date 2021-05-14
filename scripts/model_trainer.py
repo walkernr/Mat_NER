@@ -234,7 +234,7 @@ class NERTrainer(object):
             valid_metrics = self.train_evaluate_epoch(epoch, n_epoch, self.data.valid_iter, 'validate')
             # save best
             validation_f1 = np.mean(valid_metrics['f1_score'])
-            if validation_f1 > best_validation_f1:
+            if validation_f1 >= best_validation_f1:
                 best_validation_f1 = validation_f1
                 self.save_state_to_cache('best_validation_f1')
             # append histories
