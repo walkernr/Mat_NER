@@ -94,75 +94,77 @@ if __name__ == '__main__':
                     bilstm_history_path = (Path(__file__).parent / '../model/bilstm/history/{}_history.pt'.format(alias)).resolve().as_posix()
                     bilstm_test_path = (Path(__file__).parent / '../model/bilstm/test/{}_test.pt'.format(alias)).resolve().as_posix()
                     bilstm_model_path = (Path(__file__).parent / '../model/bilstm/{}_model.pt'.format(alias)).resolve().as_posix()
+                    if os.path.exists(bilstm_test_path):
+                        print('already calculated {}, skipping'.format(alias))
+                    else:
+                        try:
+                            data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), (0.1, split/800, split/100), seed), seed, sentence_level), tag_scheme)
+                            save_tagged_splits(data_path, dataset, '_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), data)
+                            corpus = DataCorpus(data_path=data_path, data_name=dataset, alias='_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), vector_path=vector_path,
+                                                tokenizer=tokenizer, cased=cased, tag_scheme=tag_scheme, batch_size=batch_size, device=device)
+                            
+                            embedding_dim = corpus.embedding_dim
+                            text_vocab_size = len(corpus.text_field.vocab)
+                            char_vocab_size = len(corpus.char_field.vocab)
+                            tag_vocab_size = len(corpus.tag_field.vocab)
+                            tag_names = corpus.tag_names
 
-                    # try:
-                    data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), (0.1, split/800, split/100), seed), seed, sentence_level), tag_scheme)
-                    save_tagged_splits(data_path, dataset, '_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), data)
-                    corpus = DataCorpus(data_path=data_path, data_name=dataset, alias='_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), vector_path=vector_path,
-                                        tokenizer=tokenizer, cased=cased, tag_scheme=tag_scheme, batch_size=batch_size, device=device)
-                    
-                    embedding_dim = corpus.embedding_dim
-                    text_vocab_size = len(corpus.text_field.vocab)
-                    char_vocab_size = len(corpus.char_field.vocab)
-                    tag_vocab_size = len(corpus.tag_field.vocab)
-                    tag_names = corpus.tag_names
+                            print(m*'-')
+                            print('vocabularies built')
+                            print('embedding dimension: {}'.format(embedding_dim))
+                            print('unique tokens in text vocabulary: {}'.format(text_vocab_size))
+                            print('unique tokens in char vocabulary: {}'.format(char_vocab_size))
+                            print('unique tokens in tag vocabulary: {}'.format(tag_vocab_size))
+                            print('10 most frequent words in text vocabulary: '+(10*'{} ').format(*corpus.text_field.vocab.freqs.most_common(10)))
+                            print('tags: '+(tag_vocab_size*'{} ').format(*tag_names))
+                            print(m*'-')
 
-                    print(m*'-')
-                    print('vocabularies built')
-                    print('embedding dimension: {}'.format(embedding_dim))
-                    print('unique tokens in text vocabulary: {}'.format(text_vocab_size))
-                    print('unique tokens in char vocabulary: {}'.format(char_vocab_size))
-                    print('unique tokens in tag vocabulary: {}'.format(tag_vocab_size))
-                    print('10 most frequent words in text vocabulary: '+(10*'{} ').format(*corpus.text_field.vocab.freqs.most_common(10)))
-                    print('tags: '+(tag_vocab_size*'{} ').format(*tag_names))
-                    print(m*'-')
+                            print('train set: {} {}s'.format(len(corpus.train_set), 'sentence' if sentence_level else 'paragraph'))
+                            print('valid set: {} {}s'.format(len(corpus.valid_set), 'sentence' if sentence_level else 'paragraph'))
+                            print('test set: {} {}s'.format(len(corpus.test_set), 'sentence' if sentence_level else 'paragraph'))
+                            print(m*'-')
 
-                    print('train set: {} {}s'.format(len(corpus.train_set), 'sentence' if sentence_level else 'paragraph'))
-                    print('valid set: {} {}s'.format(len(corpus.valid_set), 'sentence' if sentence_level else 'paragraph'))
-                    print('test set: {} {}s'.format(len(corpus.test_set), 'sentence' if sentence_level else 'paragraph'))
-                    print(m*'-')
+                            text_pad_idx = corpus.text_pad_idx
+                            text_unk_idx = corpus.text_unk_idx
+                            char_pad_idx = corpus.char_pad_idx
+                            tag_pad_idx = corpus.tag_pad_idx
+                            pad_token = corpus.pad_token
+                            pretrained_embeddings = corpus.text_field.vocab.vectors
 
-                    text_pad_idx = corpus.text_pad_idx
-                    text_unk_idx = corpus.text_unk_idx
-                    char_pad_idx = corpus.char_pad_idx
-                    tag_pad_idx = corpus.tag_pad_idx
-                    pad_token = corpus.pad_token
-                    pretrained_embeddings = corpus.text_field.vocab.vectors
-
-                    # initialize bilstm
-                    bilstm = BiLSTM_NER(input_dim=text_vocab_size, embedding_dim=embedding_dim,
-                                        char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,
-                                        char_filter=char_filter, char_kernel=char_kernel,
-                                        hidden_dim=hidden_dim, output_dim=tag_vocab_size,
-                                        lstm_layers=lstm_layers, attn_heads=attn_heads, use_crf=True,
-                                        embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio, lstm_dropout_ratio=lstm_dropout_ratio,
-                                        attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
-                                        tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
-                                        char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
-                                        pretrained_embeddings=pretrained_embeddings, tag_scheme=tag_scheme)
-                    # print bilstm information
-                    print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
-                    print(bilstm)
-                    print(m*'-')
+                            # initialize bilstm
+                            bilstm = BiLSTM_NER(input_dim=text_vocab_size, embedding_dim=embedding_dim,
+                                                char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,
+                                                char_filter=char_filter, char_kernel=char_kernel,
+                                                hidden_dim=hidden_dim, output_dim=tag_vocab_size,
+                                                lstm_layers=lstm_layers, attn_heads=attn_heads, use_crf=True,
+                                                embedding_dropout_ratio=embedding_dropout_ratio, cnn_dropout_ratio=cnn_dropout_ratio, lstm_dropout_ratio=lstm_dropout_ratio,
+                                                attn_dropout_ratio=attn_dropout_ratio, fc_dropout_ratio=fc_dropout_ratio,
+                                                tag_names=tag_names, text_pad_idx=text_pad_idx, text_unk_idx=text_unk_idx,
+                                                char_pad_idx=char_pad_idx, tag_pad_idx=tag_pad_idx, pad_token=pad_token,
+                                                pretrained_embeddings=pretrained_embeddings, tag_scheme=tag_scheme)
+                            # print bilstm information
+                            print('BiLSTM model initialized with {} trainable parameters'.format(bilstm.count_parameters()))
+                            print(bilstm)
+                            print(m*'-')
 
 
-                    # initialize trainer class for bilstm
-                    bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
-                                                lr=lr, max_grad_norm=max_grad_norm, device=device)
-                    
-                    print('training BiLSTM model')
-                    print(m*'-')
-                    bilstm_trainer.train(n_epoch=n_epoch)
-                    bilstm_trainer.load_state_from_cache('best_validation_f1')
-                    if keep_model:
-                        bilstm_trainer.save_model(model_path=bilstm_model_path)
-                    bilstm_trainer.save_history(history_path=bilstm_history_path)
-                    print(m*'-')
+                            # initialize trainer class for bilstm
+                            bilstm_trainer = NERTrainer(model=bilstm, data=corpus, optimizer_cls=RangerLars, criterion_cls=nn.CrossEntropyLoss,
+                                                        lr=lr, max_grad_norm=max_grad_norm, device=device)
+                            
+                            print('training BiLSTM model')
+                            print(m*'-')
+                            bilstm_trainer.train(n_epoch=n_epoch)
+                            bilstm_trainer.load_state_from_cache('best_validation_f1')
+                            if keep_model:
+                                bilstm_trainer.save_model(model_path=bilstm_model_path)
+                            bilstm_trainer.save_history(history_path=bilstm_history_path)
+                            print(m*'-')
 
-                    print('testing BiLSTM')
-                    _, _, _, labels, predictions = bilstm_trainer.test(bilstm_test_path)
-                    print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
-                                                scheme=bilstm_trainer.metric_scheme))
-                    print(m*'-')
-                    # except:
-                    #     print('error calculating {}'.format(alias))
+                            print('testing BiLSTM')
+                            _, _, _, labels, predictions = bilstm_trainer.test(bilstm_test_path)
+                            print(classification_report(labels, predictions, mode=bilstm_trainer.metric_mode,
+                                                        scheme=bilstm_trainer.metric_scheme))
+                            print(m*'-')
+                        except:
+                            print('error calculating {}'.format(alias))
