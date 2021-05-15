@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('-st', '--splits', help='comma-separated training splits to be considered, in percent (e.g. 80). test split will always be 10%% and the validation split will be 1/8 of the training split', type=str, default='80')
     parser.add_argument('-ds', '--datasets', help='comma-separated datasets to be considered (e.g. solid_state,doping)', type=str, default='solid_state')
     parser.add_argument('-sl', '--sentence_level', help='switch for sentence-level learning instead of paragraph-level', action='store_true')
-    parser.add_argument('-bs', '--batch_size', help='number of samples in each batch', type=int, default=32)
+    parser.add_argument('-bs', '--batch_size', help='number of samples in each batch', type=int, default=8)
     parser.add_argument('-ne', '--n_epochs', help='number of training epochs', type=int, default=64)
     parser.add_argument('-lr', '--learning_rate', help='optimizer learning rate', type=float, default=5e-2)
     parser.add_argument('-km', '--keep_model', help='switch for saving the best model parameters to disk', action='store_true')
@@ -48,6 +48,7 @@ if __name__ == '__main__':
     from model_trainer import NERTrainer
 
     torch.device('cuda' if gpu else 'cpu')
+    torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
     seeds = [int(seed) for seed in seeds.split(',')]
@@ -87,7 +88,6 @@ if __name__ == '__main__':
         for tag_scheme in tag_schemes:
             for split in splits:
                 for dataset in datasets:
-                    torch.manual_seed(seed)
                     data_path = (Path(__file__).parent / '../data/{}'.format(dataset)).resolve().as_posix()
                     alias = '{}_{}_crf_{}_{}_{}'.format(dataset, 'sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split)
                     # bilstm paths
@@ -104,6 +104,8 @@ if __name__ == '__main__':
                         try:
                             data = tag_abstracts(format_abstracts(split_abstracts(collect_abstracts(data_path, dataset), (0.1, split/800, split/100), seed), seed, sentence_level), tag_scheme)
                             save_tagged_splits(data_path, dataset, '_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), data)
+                            torch.manual_seed(seed)
+                            torch.cuda.manual_seed(seed)
                             corpus = DataCorpus(data_path=data_path, data_name=dataset, alias='_{}_{}_{}_{}'.format('sentence' if sentence_level else 'paragraph', tag_scheme.lower(), seed, split), vector_path=vector_path,
                                                 tokenizer=tokenizer, cased=cased, tag_scheme=tag_scheme, batch_size=batch_size, device=device)
                             
@@ -135,6 +137,8 @@ if __name__ == '__main__':
                             pad_token = corpus.pad_token
                             pretrained_embeddings = corpus.text_field.vocab.vectors
 
+                            torch.manual_seed(seed)
+                            torch.cuda.manual_seed(seed)
                             # initialize bilstm
                             bilstm = BiLSTM_NER(input_dim=text_vocab_size, embedding_dim=embedding_dim,
                                                 char_input_dim=char_vocab_size, char_embedding_dim=char_embedding_dim,

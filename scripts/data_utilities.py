@@ -10,11 +10,16 @@ def collect_abstracts(data_path, data_name):
         for line in f:
             d = json.loads(line)
             if 'solid_state' in data_name:
-                    identifier = d['doi']
+                identifier = d['doi']
             elif 'aunp' in data_name:
-                identifier = d['meta']['doi']
+                identifier = d['meta']['doi']+'/'+d['meta']['par']
             elif 'doping' in data_name:
                 identifier = d['text']
+            else:
+                try:
+                    identifier = d['doi']
+                except:
+                    identifier = d['meta']['doi']+'/'+d['meta']['par']
             if identifier in identifiers:
                 pass
             else:
@@ -24,7 +29,10 @@ def collect_abstracts(data_path, data_name):
 
 
 def split_abstracts(data, splits, seed):
-    random.Random(seed).shuffle(data)
+    if seed:
+        random.Random(seed).shuffle(data)
+    else:
+        random.shuffle(data)
     splits = (np.cumsum(splits)*len(data)).astype(np.uint16)
     test_set = data[:splits[0]]
     valid_set = data[splits[0]:splits[1]]
@@ -42,7 +50,10 @@ def format_abstracts(data_split, seed, sentence_level=True):
             else:
                 dat = [{key : [token[key] for sentence in d['tokens'] for token in sentence] for key in ['text', 'annotation']}]
             data_fmt[split].extend(dat)
-        random.Random(seed).shuffle(data_fmt[split])
+        if seed:
+            random.Random(seed).shuffle(data_fmt[split])
+        else:
+            random.shuffle(data_fmt[split])
     return data_fmt
 
 

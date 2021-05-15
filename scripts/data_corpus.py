@@ -8,7 +8,7 @@ from torchtext.vocab import Vocab
 
 
 class DataCorpus(object):
-    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, tag_scheme, batch_size, device):
+    def __init__(self, data_path, data_name, alias, vector_path, tokenizer, cased, tag_scheme, batch_size, device, seed):
         self.data_path = data_path
         self.data_name = data_name
         self.alias = alias
@@ -18,6 +18,10 @@ class DataCorpus(object):
         self.tag_scheme = tag_scheme
         self.batch_size = batch_size
         self.device = device
+        self.seed = seed
+        if seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
         self.pad_token = self.tokenizer.pad_token
         self.unk_token = self.tokenizer.unk_token
         self.initialize_fields()

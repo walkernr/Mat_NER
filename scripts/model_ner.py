@@ -31,7 +31,7 @@ class NERModel(nn.Module):
                  embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
                  tag_names, text_pad_idx, text_unk_idx,
                  char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_scheme):
+                 pretrained_embeddings, tag_scheme, seed):
         '''
         basic class for named entity recognition models. inherits from neural network module.
         layers and forward function will be defined by a child class.
@@ -78,10 +78,15 @@ class NERModel(nn.Module):
         self.pretrained_embeddings = pretrained_embeddings
         # tag format
         self.tag_scheme = tag_scheme
+        # seed
+        self.seed = seed
     
 
     def init_weights(self):
         ''' initializes model weights '''
+        if self.seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
         for name, param in self.named_parameters():
             nn.init.normal_(param.data, mean=0, std=0.1)
     
@@ -95,6 +100,9 @@ class NERModel(nn.Module):
 
 
     def init_crf(self):
+        if self.seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
         self.crf.crf.reset_parameters()
         # construct definitions of invalid transitions
         self.crf.define_invalid_crf_transitions()
