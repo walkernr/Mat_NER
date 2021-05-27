@@ -48,6 +48,10 @@ class DataCorpus(object):
     def load_data(self):
         fields = ((('text', 'char'), (self.text_field, self.char_field)),
                   ('label', self.label_field))
+        if self.seed:
+            torch.manual_seed(self.seed)
+            torch.cuda.manual_seed(self.seed)
+            np.random.seed(self.seed)
         self.train_set, self.valid_set, self.test_set = SequenceTaggingDataset.splits(fields=fields, path=self.data_path+'/split/',
                                                                                       train=self.data_name+self.alias+'_train.tsv',
                                                                                       validation=self.data_name+self.alias+'_valid.tsv',
