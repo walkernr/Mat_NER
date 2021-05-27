@@ -2,10 +2,11 @@ import math
 import torch
 from torch import nn
 from model_crf import CRF
+import numpy as np
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=500):
+    def __init__(self, d_model, dropout=0.1, max_len=512):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         pe = torch.zeros(max_len, d_model)
@@ -27,11 +28,11 @@ class NERModel(nn.Module):
     def __init__(self, input_dim, embedding_dim,
                  char_input_dim, char_embedding_dim,
                  char_filter, char_kernel, 
-                 hidden_dim, output_dim, attn_heads, use_crf,
-                 embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
-                 tag_names, text_pad_idx, text_unk_idx,
-                 char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_scheme, seed):
+                 hidden_dim, output_dim, attn_heads,
+                 embedding_dropout_ratio, cnn_dropout_ratio, classifier_dropout_ratio,
+                 classes, text_pad_idx, text_unk_idx,
+                 char_pad_idx, pad_token,
+                 pretrained_embeddings, scheme, seed):
         '''
         basic class for named entity recognition models. inherits from neural network module.
         layers and forward function will be defined by a child class.
@@ -45,18 +46,16 @@ class NERModel(nn.Module):
         hidden_dim: hidden dimension
         output_dim: output dimension
         attn_heads: number of attention heads for attention component (set to zero or None to ignore)
-        use_crf: switch for using conditional random field (reduces probability of invalid tagging sequences)
         embedding_dropout_ratio: dropout for embedding layer
         cnn_dropout_ratio: dropout for convolutions over characters
-        fc_dropout_ratio: dropout for fully connected layer
-        tag_names: the names of all of the tags in the tag field
+        classifier_dropout_ratio: dropout for fully connected layer
+        classes: the names of all of the tags in the tag field
         text_pad_idx: index for text padding token
         text_unk_idx: indices for text unknown tokens
         char_pad_idx: indices for character unknown tokens
-        tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_scheme: tagging format
+        scheme: tagging format
         '''
         # initialize the superclass
         super().__init__()
@@ -66,18 +65,18 @@ class NERModel(nn.Module):
         self.char_filter, self.char_kernel = char_filter, char_kernel
         self.hidden_dim, self.output_dim = hidden_dim, output_dim
         # attention heads and crf
-        self.attn_heads, self.use_crf = attn_heads, use_crf
+        self.attn_heads = attn_heads
         # dropout ratios
-        self.embedding_dropout_ratio, self.cnn_dropout_ratio, self.fc_dropout_ratio = embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio
+        self.embedding_dropout_ratio, self.cnn_dropout_ratio, self.classifier_dropout_ratio = embedding_dropout_ratio, cnn_dropout_ratio, classifier_dropout_ratio
         # tagging format
-        self.tag_names = tag_names
+        self.classes = classes
         # indices for padding and unknown tokens
-        self.text_pad_idx, self.text_unk_idx, self.char_pad_idx, self.tag_pad_idx = text_pad_idx, text_unk_idx, char_pad_idx, tag_pad_idx
+        self.text_pad_idx, self.text_unk_idx, self.char_pad_idx = text_pad_idx, text_unk_idx, char_pad_idx
         self.pad_token = pad_token
         # pretrained word embeddings
         self.pretrained_embeddings = pretrained_embeddings
         # tag format
-        self.tag_scheme = tag_scheme
+        self.scheme = scheme
         # seed
         self.seed = seed
     
@@ -85,10 +84,12 @@ class NERModel(nn.Module):
     def init_weights(self):
         ''' initializes model weights '''
         if self.seed:
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed(seed)
+            torch.manual_seed(self.seed)
+            torch.cuda.manual_seed(self.seed)
+            np.random.seed(self.seed)
         for name, param in self.named_parameters():
             nn.init.normal_(param.data, mean=0, std=0.1)
+        self.crf.initialize(seed=self.seed)
     
 
     def init_embeddings(self):
@@ -96,18 +97,7 @@ class NERModel(nn.Module):
         for idx in (self.text_unk_idx, self.text_pad_idx):
             self.embedding.weight.data[idx] = torch.zeros(self.embedding_dim)
         if self.pretrained_embeddings is not None:
-            self.embedding = nn.Embedding.from_pretrained(embeddings=torch.as_tensor(self.pretrained_embeddings), padding_idx=self.text_pad_idx, freeze=True)
-
-
-    def init_crf(self):
-        if self.seed:
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed(seed)
-        self.crf.crf.reset_parameters()
-        # construct definitions of invalid transitions
-        self.crf.define_invalid_crf_transitions()
-        # initialize transitions
-        self.crf.init_crf_transitions()       
+            self.embedding = nn.Embedding.from_pretrained(embeddings=torch.as_tensor(self.pretrained_embeddings), padding_idx=self.text_pad_idx, freeze=True)     
 
 
     def count_parameters(self):
@@ -120,12 +110,12 @@ class BiLSTM_NER(NERModel):
                  char_input_dim, char_embedding_dim,
                  char_filter, char_kernel, 
                  hidden_dim, output_dim,
-                 lstm_layers, attn_heads, use_crf,
+                 lstm_layers, attn_heads,
                  embedding_dropout_ratio, cnn_dropout_ratio, lstm_dropout_ratio,
-                 attn_dropout_ratio, fc_dropout_ratio,
-                 tag_names, text_pad_idx, text_unk_idx,
-                 char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_scheme):
+                 attn_dropout_ratio, classifier_dropout_ratio,
+                 classes, text_pad_idx, text_unk_idx,
+                 char_pad_idx, pad_token,
+                 pretrained_embeddings, scheme, seed):
         '''
         BiLSTM model for named entity recognition. inherits from named recognition model
 
@@ -139,30 +129,28 @@ class BiLSTM_NER(NERModel):
         output_dim: output dimension
         lstm_layers: number of lstm layers
         attn_heads: number of attention heads for attention component (set to zero or None to ignore)
-        use_crf: switch for using conditional random field (reduces probability of invalid tagging sequences)
         embedding_dropout_ratio: dropout for embedding layer
         cnn_dropout_ratio: dropout for convolutions over characters
         lstm_dropout_ratio: dropout for lstm layers
         attn_dropout_ratio: dropout for attention layer
-        fc_dropout_ratio: dropout for fully connected layer
-        tag_names: the names of all of the tags in the tag field
+        classifier_dropout_ratio: dropout for fully connected layer
+        classes: the names of all of the tags in the tag field
         text_pad_idx: index for text padding token
         text_unk_idx: indices for text unknown tokens
         char_pad_idx: indices for character unknown tokens
-        tag_pad_idx: index for tag padding token
         pad_token: pad_token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_scheme: tagging format
+        scheme: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
                          char_input_dim, char_embedding_dim,
                          char_filter, char_kernel, 
-                         hidden_dim, output_dim, attn_heads, use_crf,
-                         embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
-                         tag_names, text_pad_idx, text_unk_idx,
-                         char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, tag_scheme)
+                         hidden_dim, output_dim, attn_heads,
+                         embedding_dropout_ratio, cnn_dropout_ratio, classifier_dropout_ratio,
+                         classes, text_pad_idx, text_unk_idx,
+                         char_pad_idx, pad_token,
+                         pretrained_embeddings, scheme, seed)
         # network structure settings
         self.lstm_layers = lstm_layers
         # dropout ratios
@@ -173,8 +161,6 @@ class BiLSTM_NER(NERModel):
         self.init_weights()
         # initialize model embeddings
         self.init_embeddings()
-        if self.use_crf:
-            self.init_crf()
 
 
     def build_model_layers(self):
@@ -185,74 +171,68 @@ class BiLSTM_NER(NERModel):
         # dropout for embedding layer
         self.embedding_dropout = nn.Dropout(self.embedding_dropout_ratio)
         # character cnn
-        if self.char_embedding_dim:
-            self.char_embedding = nn.Embedding(num_embeddings=self.char_input_dim,
-                                               embedding_dim=self.char_embedding_dim,
-                                               padding_idx=self.char_pad_idx)
-            self.char_cnn = nn.Conv1d(in_channels=self.char_embedding_dim,
-                                      out_channels=self.char_embedding_dim*self.char_filter,
-                                      kernel_size=self.char_kernel,
-                                      groups=self.char_embedding_dim)
-            self.cnn_dropout = nn.Dropout(self.cnn_dropout_ratio)
-            all_embedding_dim = self.embedding_dim+(self.char_embedding_dim*self.char_filter)
-        else:
-            all_embedding_dim = self.embedding_dim
+        self.char_embedding = nn.Embedding(num_embeddings=self.char_input_dim,
+                                            embedding_dim=self.char_embedding_dim,
+                                            padding_idx=self.char_pad_idx)
+        self.char_cnn = nn.Conv1d(in_channels=self.char_embedding_dim,
+                                    out_channels=self.char_embedding_dim*self.char_filter,
+                                    kernel_size=self.char_kernel,
+                                    groups=self.char_embedding_dim)
+        self.cnn_dropout = nn.Dropout(self.cnn_dropout_ratio)
+        all_embedding_dim = self.embedding_dim+(self.char_embedding_dim*self.char_filter)
         # lstm layers with dropout
         self.lstm = nn.LSTM(batch_first=True, input_size=all_embedding_dim,
                             hidden_size=self.hidden_dim, num_layers=self.lstm_layers,
                             bidirectional=True, dropout=self.lstm_dropout_ratio if self.lstm_layers > 1 else 0)
         # use multihead attention if there are attention heads
-        if self.attn_heads:
-            self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim*2, num_heads=self.attn_heads, dropout=self.attn_dropout_ratio)
+        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim*2, num_heads=self.attn_heads, dropout=self.attn_dropout_ratio)
         # dropout for fully connected layer
-        self.fc_dropout = nn.Dropout(self.fc_dropout_ratio)
+        self.classifier_dropout = nn.Dropout(self.classifier_dropout_ratio)
         # fully connected layer
-        self.fc = nn.Linear(self.hidden_dim*2, self.output_dim)
-        # use crf layer if it is switched on
-        if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_scheme)            
+        self.classifier = nn.Linear(self.hidden_dim*2, self.output_dim)
+        # crf layer
+        self.crf = CRF(self.pad_token, self.classes, self.scheme)            
     
 
-    def forward(self, sentence, characters, tags):
+    def forward(self, token_ids, char_ids, attention_mask, label_ids=None, return_logits=False):
         ''' forward operation for network '''
         # the output of the embedding layer is dropout(embedding(input))
-        embedding_out = self.embedding_dropout(self.embedding(sentence))
-        if self.char_embedding_dim:
-            char_embedding_out = self.embedding_dropout(self.char_embedding(characters))
-            batch_size, sentence_len, word_len, char_embedding_dim = char_embedding_out.shape
-            char_cnn_max_out = torch.zeros(batch_size, sentence_len, self.char_cnn.out_channels, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-            # iterate over sentences
-            for sentence_i in range(sentence_len):
-                # character field of sentence i
-                sentence_char_embedding = char_embedding_out[:, sentence_i, :, :]
-                # channels last
-                sentence_char_embedding_p = sentence_char_embedding.permute(0, 2, 1)
-                char_cnn_sentence_out = self.char_cnn(sentence_char_embedding_p)
-                char_cnn_max_out[:, sentence_i, :], _ = torch.max(char_cnn_sentence_out, dim=2)
-            char_cnn = self.cnn_dropout(char_cnn_max_out)
-            # concatenate word and character embeddings
-            word_features = torch.cat((embedding_out, char_cnn), dim=2)
-            # lstm of embedding output
-            lstm_out, _ = self.lstm(word_features)
-        else:
-            # lstm of embedding output
-            lstm_out, _ = self.lstm(embedding_out)
+        embedding_out = self.embedding_dropout(self.embedding(token_ids))
+        char_embedding_out = self.embedding_dropout(self.char_embedding(char_ids))
+        batch_size, sequence_len, word_len, char_embedding_dim = char_embedding_out.shape
+        char_cnn_max_out = torch.zeros(batch_size, sequence_len, self.char_cnn.out_channels, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+        # iterate over sentences
+        for i in range(sequence_len):
+            # character field of sentence i
+            sequence_char_embedding = char_embedding_out[:, i, :, :]
+            # channels last
+            sequence_char_embedding_p = sequence_char_embedding.permute(0, 2, 1)
+            char_cnn_sentence_out = self.char_cnn(sequence_char_embedding_p)
+            char_cnn_max_out[:, i, :], _ = torch.max(char_cnn_sentence_out, dim=2)
+        char_cnn = self.cnn_dropout(char_cnn_max_out)
+        # concatenate word and character embeddings
+        word_features = torch.cat((embedding_out, char_cnn), dim=2)
+        # lstm of embedding output
+        lstm_out, _ = self.lstm(word_features)
         # attention layer
-        if self.attn_heads:
-            # masking using the text padding index
-            key_padding_mask = torch.as_tensor(sentence == self.text_pad_idx).permute(1, 0)
-            # attention outputs
-            attn_out, attn_weight = self.attn(lstm_out, lstm_out, lstm_out, key_padding_mask=key_padding_mask)
-            # fully connected layer as function of attention output
-            fc_out = self.fc(self.fc_dropout(attn_out))
+        # masking using the text padding index
+        key_padding_mask = torch.as_tensor(token_ids == self.text_pad_idx).permute(1, 0)
+        # attention outputs
+        attn_out, attn_weight = self.attn(lstm_out, lstm_out, lstm_out, key_padding_mask=key_padding_mask)
+        # fully connected layer as function of attention output
+        logits = self.classifier(self.classifier_dropout(attn_out))
+        prediction_ids = self.crf.decode(logits, mask=attention_mask)
+        if label_ids is not None:
+            loss = -self.crf(logits, label_ids, mask=attention_mask)
+        # return statements
+        if return_logits and label_ids is not None:
+            return loss, logits, prediction_ids
+        elif label_ids is not None:
+            return loss, prediction_ids
+        elif return_logits:
+            return logits, prediction_ids
         else:
-            # fully connected layer as function of lstm output
-            fc_out = self.fc(self.fc_dropout(lstm_out))
-        if self.use_crf:
-            crf_out, crf_loss = self.crf(fc_out, tags)
-            return crf_out, crf_loss
-        else:
-            return fc_out
+            return prediction_ids
 
 
 class Transformer_NER(NERModel):
@@ -260,12 +240,12 @@ class Transformer_NER(NERModel):
                  char_input_dim, char_embedding_dim,
                  char_filter, char_kernel, 
                  hidden_dim, output_dim,
-                 trf_layers, attn_heads, use_crf,
+                 trf_layers, attn_heads,
                  embedding_dropout_ratio, cnn_dropout_ratio, trf_dropout_ratio,
-                 fc_dropout_ratio,
-                 tag_names, text_pad_idx, text_unk_idx,
-                 char_pad_idx, tag_pad_idx, pad_token,
-                 pretrained_embeddings, tag_scheme):
+                 classifier_dropout_ratio,
+                 classes, text_pad_idx, text_unk_idx,
+                 char_pad_idx, pad_token,
+                 pretrained_embeddings, scheme, seed):
         '''
         Transformer model for named entity recognition. inherits from neural network module
 
@@ -279,28 +259,26 @@ class Transformer_NER(NERModel):
         output_dim: output dimension
         trf_layers: number of trf layers
         attn_heads: number of attention heads for attention component (set to zero or None to ignore)
-        use_crf: switch for using conditional random field (reduces probability of invalid tagging sequences)
         embedding_dropout_ratio: dropout for embedding layer
         cnn_dropout_ratio: dropout for convolutions over characters
         trf_dropout_ratio: dropout for trf layers
-        fc_dropout_ratio: dropout for fully connected layer
-        tag_names: the names of all of the tags in the tag field
+        classifier_dropout_ratio: dropout for fully connected layer
+        classes: the names of all of the tags in the tag field
         text_pad_idx: index for text padding token
         text_unk_idx: indices for text unknown tokens
         char_pad_idx: indices for character unknown tokens
-        tag_pad_idx: index for tag padding token
         pretrained_embeddings: the pretrained word vectors for the dataset
-        tag_scheme: tagging format
+        scheme: tagging format
         '''
         # initialize the superclass
         super().__init__(input_dim, embedding_dim,
                          char_input_dim, char_embedding_dim,
                          char_filter, char_kernel, 
-                         hidden_dim, output_dim, attn_heads, use_crf,
-                         embedding_dropout_ratio, cnn_dropout_ratio, fc_dropout_ratio,
-                         tag_names, text_pad_idx, text_unk_idx,
-                         char_pad_idx, tag_pad_idx, pad_token,
-                         pretrained_embeddings, tag_scheme)
+                         hidden_dim, output_dim, attn_heads,
+                         embedding_dropout_ratio, cnn_dropout_ratio, classifier_dropout_ratio,
+                         classes, text_pad_idx, text_unk_idx,
+                         char_pad_idx, pad_token,
+                         pretrained_embeddings, scheme, seed)
         # network structure settings
         self.trf_layers = trf_layers
         # dropout ratios
@@ -311,9 +289,6 @@ class Transformer_NER(NERModel):
         self.init_weights()
         # initialize model embeddings
         self.init_embeddings()
-        # initialize model embeddings
-        if self.use_crf:
-            self.init_crf()
 
 
     def build_model_layers(self):
@@ -324,69 +299,68 @@ class Transformer_NER(NERModel):
         # dropout for embedding layer
         self.embedding_dropout = nn.Dropout(self.embedding_dropout_ratio)
         # character cnn
-        if self.char_embedding_dim:
-            self.char_embedding = nn.Embedding(num_embeddings=self.char_input_dim,
-                                               embedding_dim=self.char_embedding_dim,
-                                               padding_idx=self.char_pad_idx)
-            self.char_cnn = nn.Conv1d(in_channels=self.char_embedding_dim,
-                                      out_channels=self.char_embedding_dim*self.char_filter,
-                                      kernel_size=self.char_kernel,
-                                      groups=self.char_embedding_dim)
-            self.cnn_dropout = nn.Dropout(self.cnn_dropout_ratio)
-            # lstm layers with dropout
-            all_embedding_dim = self.embedding_dim+(self.char_embedding_dim*self.char_filter)
-        else:
-            all_embedding_dim = self.embedding_dim
+        self.char_embedding = nn.Embedding(num_embeddings=self.char_input_dim,
+                                            embedding_dim=self.char_embedding_dim,
+                                            padding_idx=self.char_pad_idx)
+        self.char_cnn = nn.Conv1d(in_channels=self.char_embedding_dim,
+                                    out_channels=self.char_embedding_dim*self.char_filter,
+                                    kernel_size=self.char_kernel,
+                                    groups=self.char_embedding_dim)
+        self.cnn_dropout = nn.Dropout(self.cnn_dropout_ratio)
+        # lstm layers with dropout
+        all_embedding_dim = self.embedding_dim+(self.char_embedding_dim*self.char_filter)
         # transformer encoder layers with attention and dropout
         self.position_encoder = PositionalEncoding(d_model=all_embedding_dim)
         encoder_layers = nn.TransformerEncoderLayer(d_model=all_embedding_dim, nhead=self.attn_heads, activation='relu', dropout=self.trf_dropout_ratio)
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layers, num_layers=self.trf_layers)
         # fully connected layer with gelu activation
-        self.fc1 = nn.Linear(in_features=all_embedding_dim, out_features=self.hidden_dim)
-        self.fc1_gelu = nn.GELU()
+        self.dense = nn.Linear(in_features=all_embedding_dim, out_features=self.hidden_dim)
+        self.dense_gelu = nn.GELU()
         # layer norm
-        self.fc1_norm = nn.LayerNorm(self.hidden_dim)
+        self.dense_norm = nn.LayerNorm(self.hidden_dim)
         # dropout for fully connected layer
-        self.fc2_dropout = nn.Dropout(self.fc_dropout_ratio)
+        self.classifier_dropout = nn.Dropout(self.classifier_dropout_ratio)
         # fully connected layer
-        self.fc2 = nn.Linear(self.hidden_dim, self.output_dim)
-        # use crf layer if it is switched on
-        if self.use_crf:
-            self.crf = CRF(self.tag_pad_idx, self.pad_token, self.tag_names, self.tag_scheme)
+        self.classifier = nn.Linear(self.hidden_dim, self.output_dim)
+        # crf layer
+        self.crf = CRF(self.pad_token, self.classes, self.scheme)
     
 
-    def forward(self, sentence, characters, tags):
+    def forward(self, token_ids, char_ids, attention_mask, label_ids=None, return_logits=False):
         ''' forward operation for network '''
         # the output of the embedding layer is dropout(embedding(input))
-        embedding_out = self.embedding_dropout(self.embedding(sentence))
-        key_padding_mask = torch.as_tensor(sentence == self.text_pad_idx).permute(1, 0)
-        if self.char_embedding_dim:
-            char_embedding_out = self.embedding_dropout(self.char_embedding(characters))
-            batch_size, sentence_len, word_len, char_embedding_dim = char_embedding_out.shape
-            char_cnn_max_out = torch.zeros(batch_size, sentence_len, self.char_cnn.out_channels)
-            # iterate over sentences
-            for sentence_i in range(sentence_len):
-                # character field of sentence i
-                sentence_char_embedding = char_embedding_out[:, sentence_i, :, :]
-                # channels last
-                sentence_char_embedding_p = sentence_char_embedding.permute(0, 2, 1)
-                char_cnn_sentence_out = self.char_cnn(sentence_char_embedding_p)
-                char_cnn_max_out[:, sentence_i, :], _ = torch.max(char_cnn_sentence_out, dim=2)
-            char_cnn = self.cnn_dropout(char_cnn_max_out)
-            # concatenate word and character embeddings
-            word_features = torch.cat((embedding_out, char_cnn), dim=2)
-            # positional encoding
-            pos_out = self.position_encoder(word_features)
-        else:
-            # positional encoding
-            pos_out = self.position_encoder(embedding_out)
+        embedding_out = self.embedding_dropout(self.embedding(token_ids))
+        key_padding_mask = torch.as_tensor(token_ids == self.text_pad_idx).permute(1, 0)
+        char_embedding_out = self.embedding_dropout(self.char_embedding(char_ids))
+        batch_size, sequence_len, word_len, char_embedding_dim = char_embedding_out.shape
+        char_cnn_max_out = torch.zeros(batch_size, sequence_len, self.char_cnn.out_channels)
+        # iterate over sentences
+        for i in range(sequence_len):
+            # character field of sentence i
+            sequence_char_embedding = char_embedding_out[:, i, :, :]
+            # channels last
+            sequence_char_embedding_p = sequence_char_embedding.permute(0, 2, 1)
+            char_cnn_sentence_out = self.char_cnn(sequence_char_embedding_p)
+            char_cnn_max_out[:, i, :], _ = torch.max(char_cnn_sentence_out, dim=2)
+        char_cnn = self.cnn_dropout(char_cnn_max_out)
+        # concatenate word and character embeddings
+        word_features = torch.cat((embedding_out, char_cnn), dim=2)
+        # positional encoding
+        pos_out = self.position_encoder(word_features)
         # encoding
         enc_out = self.encoder(pos_out, src_key_padding_mask=key_padding_mask)
         # fully connected layers
-        fc1_out = self.fc1_norm(self.fc1_gelu(self.fc1(enc_out)))
-        fc2_out = self.fc2(self.fc2_dropout(fc1_out))
-        if self.use_crf:
-            crf_out, crf_loss = self.crf(fc2_out, tags)
-            return crf_out, crf_loss
+        dense_out = self.dense_norm(self.dense_gelu(self.dense(enc_out)))
+        logits = self.classifier(self.classifier_dropout(dense_out))
+        prediction_ids = self.crf.decode(logits, mask=attention_mask)
+        if label_ids is not None:
+            loss = -self.crf(logits, label_ids, mask=attention_mask)
+        # return statements
+        if return_logits and label_ids is not None:
+            return loss, logits, prediction_ids
+        elif label_ids is not None:
+            return loss, prediction_ids
+        elif return_logits:
+            return logits, prediction_ids
         else:
-            return fc2_out
+            return prediction_ids
