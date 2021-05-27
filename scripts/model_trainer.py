@@ -112,7 +112,7 @@ class NERTrainer(object):
         # set classes in model
         self.model.classes = checkpoint['classes']
         # rebuild model layers
-        self.model.build_model()
+        self.model.build_model_layers()
         # send model to device
         self.model.to(self.device)
         # load model parameters from state dictionary
