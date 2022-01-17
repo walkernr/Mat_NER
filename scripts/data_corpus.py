@@ -2,8 +2,8 @@ import numpy as np
 from collections import Counter
 import gensim
 import torch
-from torchtext.legacy.data import Field, NestedField, Iterator
-from torchtext.legacy.datasets import SequenceTaggingDataset
+from torchtext.data import Field, NestedField, Iterator
+from torchtext.datasets import SequenceTaggingDataset
 from torchtext.vocab import Vocab
 
 
