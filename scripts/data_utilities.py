@@ -45,8 +45,8 @@ def format_abstracts(data_split, sentence_level=True):
     data_fmt = {key: [] for key in data_split.keys()}
     for split in data_split.keys():
         for d in data_split[split]:
-            if split == 'test':
-                print(d['doi'])
+            # if split == 'test':
+            #     print(d['doi'])
             if sentence_level:
                 dat = [{'text': [token['text'] for token in sentence], 'annotation': [token['annotation'] for token in sentence]} for sentence in d['tokens']]
             else:
