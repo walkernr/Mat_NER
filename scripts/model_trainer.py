@@ -2,7 +2,8 @@ import copy
 import numpy as np
 from tqdm import tqdm
 import torch
-from torchtools.optim import AdamW, RangerLars
+from torch.optim import Adam
+from torchtools.optim import AdamW, RangerLars, Ralamb, Ranger, Novograd, RAdam, Lamb, Lookahead
 from torch.optim.lr_scheduler import LambdaLR
 from seqeval.scheme import IOB1, IOB2, IOBES
 from seqeval.metrics import accuracy_score, classification_report
@@ -192,7 +193,7 @@ class NERTrainer(object):
         return self.epoch_metrics
 
     
-    def init_optimizer(self, optimizer_name, lr):
+    def init_optimizer(self, optimizer_name, lr, weight_decay):
         '''
         Initialize optimizer
             Arguments:
@@ -202,16 +203,34 @@ class NERTrainer(object):
                 None
         ''' 
         # optimizer dict
-        optimizers = {'adamw': AdamW, 'rangerlars': RangerLars}
+        optimizer_options = optimizer_name.split('_')
+        optimizer_name = optimizer_options[0]
+        if len(optimizer_options) > 1:
+            if optimizer_options[1] == 'lookahead':
+                la = True
+            else:
+                la = False
+        else:
+            la = False
+        optimizers = {'adam': Adam, 'adamw': AdamW, 'rangerlars': RangerLars,
+                      'ralamb': Ralamb, 'ranger': Ranger,
+                      'novograd': Novograd, 'radam': RAdam, 'lamb': Lamb}
         # default to AdamW if invalid optimizer name provided
         if optimizer_name not in optimizers.keys():
             optimizer_name = 'adamw'
             print('Reverted to default optimizer (AdamW)')
+        no_decay = ['bias', 'gamma', 'beta']
+        params = self.model.named_parameters()
         # construct optimizer
-        self.optimizer = optimizers[optimizer_name]([{'params': self.model.parameters(), 'lr': lr}])
+        optimizer = optimizers[optimizer_name]([{'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 'lr': lr, 'weight_decay': weight_decay},
+                                                {'params': [p for n, p in params if any(nd in n for nd in no_decay)], 'lr': lr, 'weight_decay': 0.0}])
+        if la:
+            self.optimizer = Lookahead(base_optimizer=optimizer, k=10, alpha=0.5)
+        else:
+            self.optimizer = optimizer
     
 
-    def init_scheduler(self, n_epoch, function_name='exponential'):
+    def init_scheduler(self, n_epoch, scheduling_unlock, function_name):
         '''
         Initializes learning rate scheduler
             Arguments:
@@ -221,9 +240,9 @@ class NERTrainer(object):
                 None
         '''
         # dictionary of functions
-        functions = {'linear': lambda epoch: (n_epoch-epoch)/(n_epoch),
-                     'exponential': lambda epoch: 0.01**(epoch/(n_epoch-1)),
-                     'cosine': lambda epoch: 0.5*(1+np.cos(epoch/n_epoch)*np.pi)}
+        functions = {'linear': lambda epoch: (n_epoch-scheduling_unlock-epoch)/(n_epoch-scheduling_unlock),
+                     'exponential': lambda epoch: 0.1**(epoch/(n_epoch-scheduling_unlock-1)),
+                     'cosine': lambda epoch: 0.5*(1+np.cos(epoch/(n_epoch-scheduling_unlock)*np.pi))}
         # default to linear if invalid function name provided
         if function_name not in functions.keys():
             function_name = 'linear'
@@ -250,6 +269,7 @@ class NERTrainer(object):
     
     
     def process_ids(self, token_ids, prediction_ids):
+        # not currently supported
         '''
         Processes ids into tokens and labels
             Arguments:
@@ -507,7 +527,7 @@ class NERTrainer(object):
             return prediction_results
     
 
-    def train(self, n_epoch, train_iter, valid_iter, scheduling_function, save_dir, use_cache):
+    def train(self, n_epoch, train_iter, valid_iter, embedding_unfreeze, scheduling_function, scheduling_unlock, save_dir, use_cache):
         '''
         Trains the model with validation if a validation iterator is provided
             Arguments:
@@ -524,7 +544,7 @@ class NERTrainer(object):
         if valid_iter is not None:
             self.epoch_metrics['validation'] = {}
         
-        self.init_scheduler(n_epoch, scheduling_function)
+        self.init_scheduler(n_epoch, scheduling_unlock, scheduling_function)
 
         # freeze mat2vec embeddings
         for param in self.model.embedding.parameters():
@@ -535,6 +555,10 @@ class NERTrainer(object):
 
         # for each epoch
         for epoch in range(n_epoch):
+            if epoch == embedding_unfreeze:
+                for param in self.model.embedding.parameters():
+                    param.requires_grad = True
+                print('Mat2Vec embeddings unfrozen')
             # training
             train_metrics = self.train_evaluate_epoch(epoch, n_epoch, train_iter, 'train')
             # append history
@@ -553,11 +577,11 @@ class NERTrainer(object):
                     else:
                         self.save_state(save_dir)
             # step scheduler forward
-            if epoch < n_epoch-1:
+            if epoch >= scheduling_unlock and epoch < n_epoch-1:
                 self.scheduler.step()
     
     
-    def test(self, test_iter, test_path, state_path=None):
+    def test(self, test_iter, test_path=None, state_path=None):
         '''
         Evaluates the tests set and saves the predictions alongside the ground truths
             Arguments:
@@ -573,12 +597,14 @@ class NERTrainer(object):
         # evaluate the test set
         metrics, test_results = self.train_evaluate_epoch(0, 1, test_iter, 'test')
         # save the test metrics and results
-        torch.save((metrics, test_results), test_path)
+        if test_path is not None:
+            torch.save((metrics, test_results), test_path)
         # return the test metrics and results
         return metrics, test_results
     
 
     def predict(self, predict_iter, predict_path, state_path=None):
+        # not currently supported
         '''
         Predicts classifications for a dataset
             Arguments:

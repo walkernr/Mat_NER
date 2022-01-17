@@ -2,7 +2,7 @@ import numpy as np
 from collections import Counter
 import gensim
 import torch
-from torchtext.legacy.data import Field, NestedField, BucketIterator
+from torchtext.legacy.data import Field, NestedField, Iterator
 from torchtext.legacy.datasets import SequenceTaggingDataset
 from torchtext.vocab import Vocab
 
@@ -98,5 +98,5 @@ class DataCorpus(object):
             torch.manual_seed(self.seed)
             torch.cuda.manual_seed(self.seed)
             np.random.seed(self.seed)
-        self.train_iter, self.valid_iter, self.test_iter = BucketIterator.splits(datasets=(self.train_set, self.valid_set, self.test_set),
-                                                                                 batch_size=self.batch_size, shuffle=True, sort=False, device=self.device)
+        self.train_iter, self.valid_iter, self.test_iter = Iterator.splits(datasets=(self.train_set, self.valid_set, self.test_set),
+                                                                           batch_size=self.batch_size, shuffle=True, sort=False, device=self.device)
